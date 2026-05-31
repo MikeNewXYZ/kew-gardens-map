@@ -49,6 +49,9 @@ export function MapView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const hoverPopupRef = useRef<mapboxgl.Popup | null>(null);
+  // Stable handle to navigate() for use inside once-registered map handlers.
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
   const navMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const presenceMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const { myId, users } = usePresence();
@@ -270,14 +273,22 @@ export function MapView() {
           hoverPopup.remove();
         });
 
-        // Click a plant for a pinned popup (works on touch too).
+        // Click a plant for a pinned popup with a Navigate button (touch too).
         map.on("click", "plant-point", (e) => {
           const f = e.features?.[0];
           if (!f || f.geometry.type !== "Point") return;
           const p = f.properties as PlantProps;
+          const coords = f.geometry.coordinates as [number, number];
           new mapboxgl.Popup({ offset: 12 })
-            .setLngLat(f.geometry.coordinates as [number, number])
-            .setHTML(popupHTML(p.name, p.accession))
+            .setLngLat(coords)
+            .setDOMContent(
+              popupContent(p.name, p.accession, () =>
+                navigateRef.current({
+                  to: "/map",
+                  search: { dest: `${coords[0]},${coords[1]}`, destName: p.name },
+                }),
+              ),
+            )
             .addTo(map);
         });
 
@@ -340,9 +351,14 @@ export function MapView() {
 
     const go = () => {
       map.flyTo({ center: [lng, lat], zoom: 19, pitch: 55, duration: 1400 });
+      const label = search.name ?? "Selected point";
       new mapboxgl.Popup({ offset: 12 })
         .setLngLat([lng, lat])
-        .setHTML(popupHTML(search.name ?? "Selected plant"))
+        .setDOMContent(
+          popupContent(label, undefined, () =>
+            navigateRef.current({ to: "/map", search: { dest: `${lng},${lat}`, destName: label } }),
+          ),
+        )
         .addTo(map);
     };
     if (map.isStyleLoaded()) go();
@@ -513,6 +529,35 @@ export function MapView() {
 function popupHTML(name: string, accession?: string) {
   const acc = accession ? `<div class="plant-popup-acc">${accession}</div>` : "";
   return `<div class="plant-popup"><em>${name}</em>${acc}</div>`;
+}
+
+/**
+ * Build popup content as a DOM node (so the Navigate button can fire a real
+ * handler). `onNavigate` draws a walking route to this point.
+ */
+function popupContent(name: string, accession: string | undefined, onNavigate: () => void): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "plant-popup";
+
+  const title = document.createElement("em");
+  title.textContent = name;
+  root.appendChild(title);
+
+  if (accession) {
+    const acc = document.createElement("div");
+    acc.className = "plant-popup-acc";
+    acc.textContent = accession;
+    root.appendChild(acc);
+  }
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "plant-popup-nav";
+  btn.textContent = "➜ Navigate here";
+  btn.addEventListener("click", onNavigate);
+  root.appendChild(btn);
+
+  return root;
 }
 
 type MarkersRef = React.MutableRefObject<mapboxgl.Marker[]>;

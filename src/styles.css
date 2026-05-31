@@ -155,6 +155,30 @@ input {
   color: var(--brass);
 }
 
+/* Navigate button inside a pinned popup. */
+.plant-popup-nav {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  padding: 8px 12px;
+  border: 1px solid var(--leaf);
+  border-radius: 8px;
+  background: var(--leaf);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.plant-popup-nav:active {
+  background: var(--forest);
+  transform: scale(0.97);
+}
+
 /* Hover tooltip: lighter, non-interactive. */
 .plant-tip .mapboxgl-popup-content {
   padding: 7px 11px !important;
