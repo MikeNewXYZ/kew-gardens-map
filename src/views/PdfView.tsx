@@ -116,7 +116,12 @@ export function PdfView() {
                   aria-label="Reset zoom"
                   onClick={() => resetTransform()}
                 >
-                  ⤢
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M4 9V5a1 1 0 0 1 1-1h4" />
+                    <path d="M20 9V5a1 1 0 0 0-1-1h-4" />
+                    <path d="M4 15v4a1 1 0 0 0 1 1h4" />
+                    <path d="M20 15v4a1 1 0 0 1-1 1h-4" />
+                  </svg>
                 </button>
               </div>
             )}

@@ -1,0 +1,15 @@
+# Hashed build assets never change for a given URL — cache them hard.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Large static data + the visitor map: fixed filenames, so revalidate daily.
+/kew-plants.geojson
+  Cache-Control: public, max-age=86400
+/kew-locations.geojson
+  Cache-Control: public, max-age=86400
+/kew-boundary.geojson
+  Cache-Control: public, max-age=86400
+/kew-mask.geojson
+  Cache-Control: public, max-age=86400
+/kew-gardens-map.pdf
+  Cache-Control: public, max-age=604800

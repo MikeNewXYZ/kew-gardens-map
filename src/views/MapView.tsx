@@ -82,6 +82,7 @@ export function MapView() {
   const [mapReady, setMapReady] = useState(false);
   const [nav, setNav] = useState<NavInfo | null>(null);
   const [navError, setNavError] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false); // request received, working on it
   const [canRetry, setCanRetry] = useState(false); // show a retry button on the error
   const [retry, setRetry] = useState(0); // bump to re-run the navigation effect
   const [threeD, setThreeD] = useState(true); // map starts pitched (pitch 55)
@@ -527,53 +528,67 @@ export function MapView() {
   publishRouteRef.current = publishRoute;
   useEffect(() => () => publishRouteRef.current(null), []);
 
-  // Fly to a plant selected from the Search tab.
+  // Fly to a plant selected from the Search tab. Gated on mapReady (not
+  // once("load"), which never re-fires once the map has loaded).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !search.focus) return;
+    if (!map || !mapReady || !search.focus) return;
     const [lng, lat] = search.focus.split(",").map(Number);
     if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
 
-    const go = () => {
-      map.flyTo({ center: [lng, lat], zoom: 19, pitch: 55, duration: 1400 });
-      const label = search.name ?? "Selected point";
-      new mapboxgl.Popup({ offset: 12 })
-        .setLngLat([lng, lat])
-        .setDOMContent(
-          popupContent(label, undefined, () =>
-            navigateRef.current({ to: "/map", search: { dest: `${lng},${lat}`, destName: label } }),
-          ),
-        )
-        .addTo(map);
-    };
-    if (map.isStyleLoaded()) go();
-    else map.once("load", go);
-  }, [search.focus, search.name]);
+    map.flyTo({ center: [lng, lat], zoom: 19, pitch: 55, duration: 1400 });
+    const label = search.name ?? "Selected point";
+    new mapboxgl.Popup({ offset: 12 })
+      .setLngLat([lng, lat])
+      .setDOMContent(
+        popupContent(label, undefined, () =>
+          navigateRef.current({ to: "/map", search: { dest: `${lng},${lat}`, destName: label } }),
+        ),
+      )
+      .addTo(map);
+  }, [search.focus, search.name, mapReady]);
 
   // Navigate: draw a walking route from the visitor's GPS to either the nearest
   // specimen of a plant (search.route) or a fixed location (search.dest).
+  //
+  // Reliability: this gates on `mapReady` (set once on the map's "load") instead
+  // of map.once("load", …) — that listener silently never fires again if load
+  // already happened, which made Navigate randomly do nothing. We also show
+  // immediate "locating" feedback so a tap always produces a visible response.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
     const routeName = search.route;
     const destStr = search.dest;
+
+    // Nothing requested → tear down any active route + ghost.
     if (!routeName && !destStr) {
-      clearRoute(map, navMarkersRef);
-      publishRoute(null);
+      setLocating(false);
       setNav(null);
       setNavError(null);
+      setCanRetry(false);
+      if (map && mapReady) clearRoute(map, navMarkersRef);
+      publishRouteRef.current(null);
       return;
     }
 
-    let cancelled = false;
+    // A destination IS requested. Acknowledge the tap immediately, before the
+    // map finishes loading or GPS resolves.
+    setNav(null);
     setNavError(null);
     setCanRetry(false);
+    setLocating(true);
 
-    async function run() {
+    // Map not ready yet — bail; this effect re-runs the moment mapReady flips.
+    if (!map || !mapReady) return;
+
+    let cancelled = false;
+
+    (async () => {
       // Always start from the visitor's real GPS position.
       const from = await resolveStart();
-      if (cancelled || !map) return;
+      if (cancelled) return;
       if (!from) {
+        setLocating(false);
         setNav(null);
         setNavError("Couldn't get your location. Turn on location access to navigate.");
         setCanRetry(true);
@@ -588,9 +603,10 @@ export function MapView() {
       if (routeName) {
         // Geometric narrowing (nearest as the crow flies), then route the winner.
         const data = await loadPlants();
-        if (cancelled || !map) return;
+        if (cancelled) return;
         const hit = nearestNamed(from, data, routeName);
         if (!hit) {
+          setLocating(false);
           setNav(null);
           setNavError(`Couldn't find “${routeName}” in the collection.`);
           return;
@@ -602,6 +618,7 @@ export function MapView() {
       } else {
         const [lng, lat] = destStr!.split(",").map(Number);
         if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+          setLocating(false);
           setNav(null);
           setNavError("Invalid destination.");
           return;
@@ -612,29 +629,29 @@ export function MapView() {
         straightMetres = haversine(from, destCoords);
       }
 
-      const route = await fetchWalkingRoute(from, destCoords);
-      if (cancelled || !map) return;
+      // The route line is a nicety — never let a Directions failure block the
+      // navigation. Fall back to a straight line + as-the-crow-flies distance.
+      const route = await fetchWalkingRoute(from, destCoords).catch(() => null);
+      if (cancelled) return;
 
       drawRoute(map, navMarkersRef, from, destCoords, destName, route?.geometry);
-      publishRoute({
+      publishRouteRef.current({
         coordinates: (route?.geometry.coordinates ?? [from, destCoords]) as [number, number][],
         destName,
       });
+      setLocating(false);
       setNav({
         label,
         name: destName,
         metres: route?.metres ?? straightMetres,
         seconds: route?.seconds ?? null,
       });
-    }
+    })();
 
-    const start = () => void run();
-    if (map.isStyleLoaded()) start();
-    else map.once("load", start);
     return () => {
       cancelled = true;
     };
-  }, [search.route, search.dest, search.destName, retry, publishRoute]);
+  }, [search.route, search.dest, search.destName, retry, mapReady]);
 
   // Toggle between the pitched 3D view and a flat top-down 2D view.
   function toggle3D() {
@@ -678,9 +695,10 @@ export function MapView() {
   function endNavigation() {
     const map = mapRef.current;
     if (map) clearRoute(map, navMarkersRef);
-    publishRoute(null);
+    publishRouteRef.current(null);
     setNav(null);
     setNavError(null);
+    setLocating(false);
     navigate({ to: "/map", search: {} });
   }
 
@@ -702,7 +720,7 @@ export function MapView() {
         </button>
       )}
 
-      {(nav || navError) && (
+      {(nav || navError || locating) && (
         <div className={styles.navPanel}>
           {nav ? (
             <div className={styles.navBody}>
@@ -713,7 +731,7 @@ export function MapView() {
                 {nav.seconds != null && ` · ${formatDuration(nav.seconds)} walk`}
               </div>
             </div>
-          ) : (
+          ) : navError ? (
             <div className={styles.navBody}>
               <div className={styles.navName}>{navError}</div>
               {canRetry && (
@@ -725,6 +743,13 @@ export function MapView() {
                   Try again
                 </button>
               )}
+            </div>
+          ) : (
+            <div className={styles.navBody}>
+              <div className={styles.navLabel}>Navigating</div>
+              <div className={styles.navName}>
+                <span className={styles.navSpinner} aria-hidden /> Finding your route…
+              </div>
             </div>
           )}
           <button
@@ -827,7 +852,11 @@ function popupContent(name: string, accession: string | undefined, onNavigate: (
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "plant-popup-nav";
-  btn.textContent = "➜ Navigate here";
+  // Inline SVG arrow (static markup, no user input) + label — renders consistently.
+  btn.innerHTML =
+    '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" ' +
+    'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M4 12h15"/><path d="m13 5 7 7-7 7"/></svg><span>Navigate here</span>';
   btn.addEventListener("click", onNavigate);
   root.appendChild(btn);
 

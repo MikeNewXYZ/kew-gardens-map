@@ -172,14 +172,20 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
     }
 
     if (data.type === "loc") {
-      const lng = Number(data.lng);
-      const lat = Number(data.lat);
-      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
-      // Only positions inside the gardens are stored; outside, the marker drops.
-      // The active route is preserved across location ticks (which fire often).
-      users[userId] = pointInRing(lng, lat, KEW_BOUNDARY_RING)
-        ? { emoji, lng, lat, lastSeen: now, route: prev?.route }
-        : { emoji, lastSeen: now, route: prev?.route };
+      const rawLng = Number(data.lng);
+      const rawLat = Number(data.lat);
+      if (!Number.isFinite(rawLng) || !Number.isFinite(rawLat)) return;
+      // Round to ~1m so GPS jitter doesn't churn state, and store only positions
+      // inside the gardens (outside, the marker drops). Route is preserved
+      // across the frequent location ticks.
+      const inside = pointInRing(rawLng, rawLat, KEW_BOUNDARY_RING);
+      const lng = inside ? Math.round(rawLng * 1e5) / 1e5 : undefined;
+      const lat = inside ? Math.round(rawLat * 1e5) / 1e5 : undefined;
+      // Skip the write+broadcast entirely if nothing visible changed — this is
+      // what stops a room of stationary visitors from re-broadcasting the whole
+      // state on every tick. Liveness is tracked via open sockets in prune().
+      if (prev && prev.lng === lng && prev.lat === lat) return;
+      users[userId] = { emoji, lng, lat, lastSeen: now, route: prev?.route };
       this.setState({ users });
       return;
     }

@@ -2,12 +2,17 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   redirect,
 } from "@tanstack/react-router";
 import { AppLayout } from "./views/AppLayout.tsx";
-import { MapView } from "./views/MapView.tsx";
-import { PdfView } from "./views/PdfView.tsx";
-import { SearchView } from "./views/SearchView.tsx";
+
+// Code-split each tab: the map chunk carries mapbox-gl, search carries
+// minisearch, and the guide carries pdf.js/react-pdf — so visiting the map no
+// longer downloads the (heavy) PDF viewer or the search index.
+const MapView = lazyRouteComponent(() => import("./views/MapView.tsx"), "MapView");
+const SearchView = lazyRouteComponent(() => import("./views/SearchView.tsx"), "SearchView");
+const PdfView = lazyRouteComponent(() => import("./views/PdfView.tsx"), "PdfView");
 
 const rootRoute = createRootRoute({ component: AppLayout });
 

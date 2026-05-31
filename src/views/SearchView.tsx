@@ -279,7 +279,8 @@ export function SearchView() {
                       aria-label={`Navigate to nearest ${p.name}`}
                       title="Navigate to nearest"
                     >
-                      ➜ Navigate
+                      <NavArrow />
+                      Navigate
                     </button>
                   </div>
                 );

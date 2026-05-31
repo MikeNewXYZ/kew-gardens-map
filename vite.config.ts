@@ -13,6 +13,18 @@ if (!process.env.VITEST) plugins.push(cloudflare());
 
 export default defineConfig({
   plugins,
+  build: {
+    rollupOptions: {
+      output: {
+        // Keep the big, slow-changing libraries in their own cacheable chunks
+        // (and out of the app chunk that rehashes on every code change).
+        manualChunks(id) {
+          if (id.includes("node_modules/mapbox-gl")) return "mapbox";
+          if (id.includes("pdfjs-dist") || id.includes("react-pdf")) return "pdf";
+        },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,
