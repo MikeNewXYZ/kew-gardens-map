@@ -1,0 +1,246 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* ---------- Search bar ---------- */
+.searchBar {
+  flex: 0 0 auto;
+  padding: 16px calc(16px + var(--safe-right)) 12px calc(16px + var(--safe-left));
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--rule);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+.inputWrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 13px;
+  border: 1px solid var(--rule);
+  border-radius: 13px;
+  background: var(--paper-sunk);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.inputWrap:focus-within {
+  background: #fff;
+  border-color: var(--leaf);
+  box-shadow: 0 0 0 3px rgba(64, 145, 108, 0.16);
+}
+
+.searchIcon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--moss);
+  display: flex;
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 13px 0;
+  font-family: var(--font-ui);
+  font-size: 16px; /* >=16px so iOS does not zoom on focus */
+  color: var(--text);
+  border: 0;
+  outline: none;
+  background: transparent;
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+.clear {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--rule-soft);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.clear:active {
+  background: var(--rule);
+}
+
+.status {
+  margin-top: 9px;
+  padding-left: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--brass);
+}
+
+/* ---------- Results: a herbarium index ---------- */
+.results {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0 0 calc(18px + var(--safe-bottom));
+  list-style: none;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px calc(18px + var(--safe-right)) 14px calc(18px + var(--safe-left));
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+  animation: entry 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: background 0.14s ease;
+}
+
+/* Staggered reveal for the first rows. */
+.result:nth-child(1) { animation-delay: 0ms; }
+.result:nth-child(2) { animation-delay: 24ms; }
+.result:nth-child(3) { animation-delay: 48ms; }
+.result:nth-child(4) { animation-delay: 72ms; }
+.result:nth-child(5) { animation-delay: 96ms; }
+.result:nth-child(6) { animation-delay: 120ms; }
+.result:nth-child(7) { animation-delay: 144ms; }
+.result:nth-child(8) { animation-delay: 168ms; }
+.result:nth-child(n + 9) { animation-delay: 188ms; }
+
+@keyframes entry {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.result::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--leaf);
+  box-shadow: 0 0 0 3px rgba(64, 145, 108, 0.16);
+}
+
+.resultActive,
+.result:active {
+  background: #fff;
+}
+
+.resultName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.06rem;
+  line-height: 1.25;
+  color: var(--forest);
+}
+
+.resultName mark {
+  background: linear-gradient(transparent 62%, rgba(194, 160, 90, 0.42) 0);
+  color: inherit;
+  font-style: inherit;
+  padding: 0 1px;
+}
+
+.resultMeta {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.navBtn {
+  flex: 0 0 auto;
+  border: 1px solid var(--leaf);
+  border-radius: 999px;
+  background: var(--leaf);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.navBtn:active {
+  background: var(--forest);
+  transform: scale(0.96);
+}
+
+/* ---------- Idle hint & empty states ---------- */
+.empty,
+.hint {
+  padding: 40px 28px;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.empty p,
+.hint p {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.hint p:first-child {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: var(--forest);
+}
+
+.hintSub {
+  font-size: 0.88rem !important;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+.suggest {
+  margin-top: 6px !important;
+}
+
+.suggestBtn {
+  border: 0;
+  background: none;
+  color: var(--moss);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  font-style: italic;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.suggestBtn:active {
+  color: var(--leaf);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result {
+    animation: none;
+  }
+}

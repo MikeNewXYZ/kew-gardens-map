@@ -1,0 +1,162 @@
+/* ============================================================
+   Kew · Living Collection — "Herbarium" design system
+   Victorian botanical specimen sheet: aged paper, pressed-ink
+   greens, brass tags, Fraunces display + Hanken Grotesk UI.
+   Mobile-first.
+   ============================================================ */
+
+:root {
+  /* Ink & foliage */
+  --ink: #16271d;
+  --forest: #1b4332;
+  --moss: #2d6a4f;
+  --leaf: #40916c;
+  --sage: #8fae9c;
+  --mist: #d7e3da;
+
+  /* Paper */
+  --paper: #f2ecdd;
+  --paper-raised: #fbf7ec;
+  --paper-sunk: #e8e0cd;
+  --rule: #d8cdb3;
+  --rule-soft: #e4dcc8;
+
+  /* Metals & tags */
+  --brass: #9c7a3c;
+  --brass-bright: #c2a05a;
+  --rust: #9c4a32;
+
+  /* Text */
+  --text: #21302a;
+  --text-soft: #5d6b62;
+  --text-faint: #97a399;
+
+  /* Type */
+  --font-display: "Fraunces", "Georgia", serif;
+  --font-ui: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+
+  /* Safe areas */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgba(22, 39, 29, 0.08), 0 4px 14px rgba(22, 39, 29, 0.08);
+  --shadow-2: 0 8px 30px rgba(22, 39, 29, 0.22);
+
+  font-family: var(--font-ui);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--paper);
+  overscroll-behavior: none;
+}
+
+/* Faint paper grain across the whole app. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+button {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input {
+  font-family: inherit;
+}
+
+/* ---- Mapbox controls, re-skinned as brass-on-paper ---- */
+.mapboxgl-ctrl-group {
+  background: rgba(251, 247, 236, 0.92) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-1) !important;
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.mapboxgl-ctrl-group button {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.mapboxgl-ctrl-group button + button {
+  border-top: 1px solid var(--rule-soft) !important;
+}
+
+.mapboxgl-ctrl-bottom-right,
+.mapboxgl-ctrl-bottom-left {
+  margin-bottom: calc(4px + var(--safe-bottom));
+}
+
+.mapboxgl-ctrl-attrib {
+  font-family: var(--font-ui);
+  border-radius: 8px 0 0 0;
+}
+
+/* ---- Plant popups as herbarium specimen tags ---- */
+.mapboxgl-popup-content {
+  padding: 11px 15px 12px !important;
+  border-radius: 4px !important;
+  background: var(--paper-raised) !important;
+  border: 1px solid var(--rule) !important;
+  box-shadow: var(--shadow-2) !important;
+  font-family: var(--font-ui);
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: var(--paper-raised) !important;
+  border-bottom-color: var(--paper-raised) !important;
+}
+
+.plant-popup em {
+  display: block;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.2;
+  color: var(--forest);
+}
+
+.plant-popup-acc {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--rule);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* Hover tooltip: lighter, non-interactive. */
+.plant-tip .mapboxgl-popup-content {
+  padding: 7px 11px !important;
+  pointer-events: none;
+}

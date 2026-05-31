@@ -1,0 +1,215 @@
+.wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Loading badge */
+.loading {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  background: rgba(22, 39, 29, 0.92);
+  color: #f4efe1;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  border-radius: 999px;
+  box-shadow: var(--shadow-2);
+  z-index: 5;
+  backdrop-filter: blur(4px);
+}
+
+/* Navigation panel (active route) */
+.navPanel {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 28px));
+  padding: 12px 12px 12px 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(8px);
+  z-index: 6;
+}
+
+.navBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.navLabel {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brass);
+}
+
+.navName {
+  font-style: italic;
+  font-weight: 600;
+  color: #1b4332;
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.navStats {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+  font-variant-numeric: tabular-nums;
+}
+
+.navNote {
+  margin-top: 5px;
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.navClose {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: #eef0ee;
+  color: #6b7280;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.navClose:hover {
+  background: #e2e6e3;
+  color: #1b4332;
+}
+
+/* Genus legend (collapsible) */
+.legendToggle {
+  position: absolute;
+  bottom: calc(36px + var(--safe-bottom));
+  right: calc(12px + var(--safe-right));
+  padding: 9px 15px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: rgba(251, 247, 236, 0.92);
+  color: var(--forest);
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.legendToggle:hover {
+  background: var(--paper-raised);
+}
+
+.legendToggle:active {
+  transform: scale(0.95);
+}
+
+.legendHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.legendClose {
+  border: none;
+  background: transparent;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-soft);
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.legendClose:hover {
+  color: var(--forest);
+}
+
+.legend {
+  position: absolute;
+  bottom: calc(36px + var(--safe-bottom));
+  right: calc(12px + var(--safe-right));
+  width: 190px;
+  padding: 13px 15px;
+  background: rgba(251, 247, 236, 0.95);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  font-size: 0.78rem;
+}
+
+.legendTitle {
+  font-weight: 700;
+  color: var(--brass);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+.swatch {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.legendName {
+  flex: 1 1 auto;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendCount {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mobile: shrink legend, keep controls reachable */
+@media (max-width: 540px) {
+  .legend {
+    width: 158px;
+    bottom: calc(22px + var(--safe-bottom));
+  }
+}

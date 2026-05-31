@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "kew-gardens-map",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-05-26",
+  // Required by the Agents SDK.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static SPA assets (the Vite build output).
+  "assets": {
+    "directory": "./dist",
+    // Lets the Worker fall back to assets via env.ASSETS.fetch().
+    "binding": "ASSETS",
+    // TanStack Router does client-side routing, so unmatched paths (e.g. /map,
+    // /search) must serve index.html instead of a 404.
+    "not_found_handling": "single-page-application",
+    // Agent API routes must hit the Worker *before* asset routing, otherwise the
+    // SPA fallback would swallow them. Everything else is served as a static asset.
+    "run_worker_first": ["/agents/*"]
+  },
+
+  // The Agents SDK is a Durable Object framework; each Agent class is a DO.
+  "durable_objects": {
+    "bindings": [
+      { "name": "PlantCollectionAgent", "class_name": "PlantCollectionAgent" },
+      { "name": "PresenceAgent", "class_name": "PresenceAgent" }
+    ]
+  },
+  // SQLite-backed Durable Objects (required for the Agents SDK's embedded DB).
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PlantCollectionAgent"] },
+    { "tag": "v2", "new_sqlite_classes": ["PresenceAgent"] }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}

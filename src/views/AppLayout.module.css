@@ -1,0 +1,131 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+/* ---------- Topbar: pressed-ink header band ---------- */
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: calc(10px + var(--safe-top)) calc(18px + var(--safe-right)) 10px
+    calc(18px + var(--safe-left));
+  background:
+    radial-gradient(120% 140% at 0% 0%, #224d39 0%, transparent 60%),
+    linear-gradient(105deg, var(--ink), var(--forest));
+  color: #f4efe1;
+  box-shadow: 0 2px 0 var(--brass), 0 6px 18px rgba(0, 0, 0, 0.22);
+  z-index: 3;
+}
+
+.crest {
+  font-size: 1.5rem;
+  color: var(--brass-bright);
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+.brand p {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: var(--brass-bright);
+}
+
+.main {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+
+/* ---------- Bottom tab bar ---------- */
+.dock {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding-bottom: var(--safe-bottom);
+  background: var(--paper-raised);
+  border-top: 1px solid var(--rule);
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.6) inset, 0 -6px 18px rgba(22, 39, 29, 0.07);
+  z-index: 3;
+}
+
+.dockItem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 58px;
+  padding: 9px 0 8px;
+  text-decoration: none;
+  color: var(--text-faint);
+  transition: color 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Brass indicator that grows in on the active tab. */
+.dockItem::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--brass);
+  transform: translateX(-50%);
+  transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dockLabel {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.icon {
+  width: 23px;
+  height: 23px;
+  transition: transform 0.18s ease;
+}
+
+.dockItem:active .icon {
+  transform: scale(0.86);
+}
+
+.dockItemActive {
+  color: var(--forest);
+}
+
+.dockItemActive::before {
+  width: 32px;
+}
+
+.dockItemActive .icon {
+  color: var(--moss);
+}
