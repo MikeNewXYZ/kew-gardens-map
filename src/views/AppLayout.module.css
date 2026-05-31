@@ -121,6 +121,10 @@
   cursor: pointer;
   transition: transform 0.12s ease, background 0.15s ease;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
 }
 
 .you:hover:not(:disabled) {
@@ -200,6 +204,9 @@
   line-height: 1;
   cursor: pointer;
   transition: background 0.12s ease, transform 0.08s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .emojiChoice:hover {
