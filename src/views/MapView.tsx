@@ -77,7 +77,8 @@ export function MapView() {
   const navMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const presenceMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const ghostMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
-  const { myId, users, publishRoute, mortonForEveryone, failForEveryone } = usePresence();
+  const { myId, users, publishRoute, mortonForEveryone, failForEveryone, failCount } =
+    usePresence();
 
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
@@ -675,6 +676,21 @@ export function MapView() {
     };
   }, [mapReady]);
 
+  // Press "F" to pay respects — a global FAIL for the whole room.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "f" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
+        return;
+      }
+      playFail();
+      failForEveryone();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [failForEveryone]);
+
   // Show/hide a legend group's layers on the map.
   function toggleLayer(key: string) {
     const map = mapRef.current;
@@ -744,10 +760,10 @@ export function MapView() {
             playFail(); // sad trombone + dejected buzz for the presser
             failForEveryone(); // thumbs-down storm + sad video for the whole room
           }}
-          title="Fail"
+          title="Fail (or press F to pay respects)"
           aria-label="Fail button — sad trombone, thumbs down, and a sad video for everyone"
         >
-          👎 Fail
+          👎 Fail{failCount > 0 ? ` · ${failCount}` : ""}
         </button>
       )}
 

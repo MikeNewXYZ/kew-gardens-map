@@ -36,6 +36,8 @@ export interface PresenceState {
   users: Record<string, Presence>;
   /** Distinct visitors with an open socket right now (true "live" count). */
   onlineCount?: number;
+  /** Running tally of how many times the Fail button has been pressed, ever. */
+  failCount?: number;
   /** London day of the last end-of-day location wipe. */
   lastResetDay?: string;
 }
@@ -221,8 +223,11 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
     }
 
     if (data.type === "fail") {
-      // Ephemeral group fail: thumbs-down storm + sad video for everyone.
-      const msg = JSON.stringify({ type: "fail", userId });
+      // Group fail: bump the all-time tally (persisted + broadcast via state),
+      // then fan out the ephemeral event so everyone plays the takeover.
+      const count = (this.state.failCount ?? 0) + 1;
+      this.setState({ ...this.state, failCount: count });
+      const msg = JSON.stringify({ type: "fail", userId, count });
       for (const conn of this.getConnections()) conn.send(msg);
       return;
     }

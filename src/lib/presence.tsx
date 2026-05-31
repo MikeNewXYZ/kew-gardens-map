@@ -48,6 +48,7 @@ export interface Presence {
 interface PresenceState {
   users: Record<string, Presence>;
   onlineCount?: number;
+  failCount?: number;
   lastResetDay?: string;
 }
 
@@ -60,6 +61,8 @@ interface PresenceContextValue {
   users: Record<string, Presence>;
   /** Visitors with an open socket right now (the live count for the header). */
   liveCount: number;
+  /** All-time number of fails (Fail button presses) across everyone. */
+  failCount: number;
   /** Broadcast (or clear, with null) this visitor's active route as a ghost. */
   publishRoute: (route: GhostRoute | null) => void;
   /** Fire a celebration burst of this visitor's emoji for everyone. */
@@ -74,8 +77,7 @@ interface PresenceContextValue {
 
 interface Burst {
   id: number;
-  emoji: string;
-  musical?: boolean; // render random musical-note emoji instead of `emoji`
+  glyphs: string[]; // each particle picks a random glyph from this set
 }
 
 const PresenceContext = createContext<PresenceContextValue | null>(null);
@@ -100,9 +102,10 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const [userId] = useState(loadUserId);
   const [users, setUsers] = useState<Record<string, Presence>>({});
   const [liveCount, setLiveCount] = useState(0);
+  const [failCount, setFailCount] = useState(0);
   const [bursts, setBursts] = useState<Burst[]>([]);
   const burstSeq = useRef(0);
-  const [fail, setFail] = useState<{ id: number } | null>(null);
+  const [fail, setFail] = useState<{ id: number; count: number } | null>(null);
   const failSeq = useRef(0);
   const failTimer = useRef<number | null>(null);
 
@@ -112,16 +115,16 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   // A chosen avatar emoji persists across sessions and is re-applied on connect.
   const chosenEmoji = useRef<string | null>(localStorage.getItem(EMOJI_KEY));
 
-  // Spawn a celebration burst that auto-clears after the animation finishes.
-  const triggerBurst = useCallback((emoji: string, musical = false) => {
+  // Spawn a burst whose particles pick randomly from `glyphs`; auto-clears.
+  const triggerBurst = useCallback((glyphs: string[]) => {
     const id = (burstSeq.current += 1);
-    setBursts((b) => [...b, { id, emoji, musical }]);
+    setBursts((b) => [...b, { id, glyphs }]);
     setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), CELEBRATION_MS);
   }, []);
 
-  // Show the FAIL overlay (sad video) and auto-dismiss it.
-  const triggerFailOverlay = useCallback(() => {
-    setFail({ id: (failSeq.current += 1) });
+  // Show the FAIL overlay (sad video + tally) and auto-dismiss it.
+  const triggerFailOverlay = useCallback((count: number) => {
+    setFail({ id: (failSeq.current += 1), count });
     if (failTimer.current != null) clearTimeout(failTimer.current);
     failTimer.current = window.setTimeout(() => setFail(null), FAIL_MS);
   }, []);
@@ -133,18 +136,23 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     onStateUpdate: (state) => {
       setUsers(state?.users ?? {});
       setLiveCount(state?.onlineCount ?? 0);
+      setFailCount(state?.failCount ?? 0);
     },
-    // Custom (non-state) frames: celebration / Morton broadcasts from anyone.
+    // Custom (non-state) frames: celebration / Morton / fail broadcasts.
     onMessage: (event) => {
       try {
-        const data = JSON.parse(event.data as string) as { type?: string; emoji?: string };
+        const data = JSON.parse(event.data as string) as {
+          type?: string;
+          emoji?: string;
+          count?: number;
+        };
         if (data.type === "celebrate" && typeof data.emoji === "string") {
-          triggerBurst(data.emoji);
+          triggerBurst([data.emoji]);
         } else if (data.type === "morton") {
-          triggerBurst("🎵", true);
+          triggerBurst(MUSIC_EMOJI);
         } else if (data.type === "fail") {
-          triggerBurst("👎");
-          triggerFailOverlay();
+          triggerBurst(FAIL_EMOJI);
+          triggerFailOverlay(data.count ?? 0);
         }
       } catch {
         // internal agent frames / non-JSON — ignore
@@ -238,6 +246,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         myEmoji: users[userId]?.emoji,
         users,
         liveCount,
+        failCount,
         publishRoute,
         celebrate,
         mortonForEveryone,
@@ -247,22 +256,25 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     >
       {children}
       <CelebrationOverlay bursts={bursts} />
-      {fail && <FailOverlay key={fail.id} onClose={() => setFail(null)} />}
+      {fail && <FailOverlay key={fail.id} count={fail.count} onClose={() => setFail(null)} />}
     </PresenceContext.Provider>
   );
 }
 
-/** Over-the-top FAIL takeover: red flashing, screen shake, and a sad video. */
-function FailOverlay({ onClose }: { onClose: () => void }) {
+/** Over-the-top FAIL takeover: red flashing, screen shake, sirens, sad video. */
+function FailOverlay({ count, onClose }: { count: number; onClose: () => void }) {
   const src =
     `https://www.youtube.com/embed/${FAIL_VIDEO_ID}` +
     `?autoplay=1&mute=1&controls=0&playsinline=1&modestbranding=1&rel=0&loop=1&playlist=${FAIL_VIDEO_ID}`;
   return (
     <div className={failStyles.overlay} role="alertdialog" aria-label="Epic fail">
+      <div className={failStyles.siren} aria-hidden>🚨</div>
+      <div className={failStyles.sirenRight} aria-hidden>🚨</div>
       <div className={failStyles.shake}>
         <div className={failStyles.title}>
           EPIC <span className={failStyles.titleHuge}>FAIL</span> 👎
         </div>
+        <div className={failStyles.subtitle} aria-hidden>womp&nbsp;womp&nbsp;womp.</div>
         <div className={failStyles.videoWrap}>
           <iframe
             className={failStyles.video}
@@ -273,6 +285,7 @@ function FailOverlay({ onClose }: { onClose: () => void }) {
             allowFullScreen
           />
         </div>
+        {count > 0 && <div className={failStyles.tally}>FAIL #{count}</div>}
         <button type="button" className={failStyles.dismiss} onClick={onClose}>
           Ugh, dismiss
         </button>
@@ -287,20 +300,21 @@ function CelebrationOverlay({ bursts }: { bursts: Burst[] }) {
   return (
     <div className={celebrationStyles.overlay} aria-hidden>
       {bursts.map((b) => (
-        <EmojiBurst key={b.id} emoji={b.emoji} musical={b.musical} />
+        <EmojiBurst key={b.id} glyphs={b.glyphs} />
       ))}
     </div>
   );
 }
 
 const MUSIC_EMOJI = ["🎵", "🎶", "🎼", "🎹", "🎺", "🎷", "🥁", "🎸"];
+const FAIL_EMOJI = ["👎", "💀", "📉", "🤡", "😭", "💩", "🚫", "❌"];
 
-function EmojiBurst({ emoji, musical }: { emoji: string; musical?: boolean }) {
+function EmojiBurst({ glyphs }: { glyphs: string[] }) {
   // Randomised once per burst so particles don't reshuffle on re-render.
   const particles = useMemo(
     () =>
       Array.from({ length: PARTICLE_COUNT }, () => ({
-        glyph: musical ? MUSIC_EMOJI[Math.floor(Math.random() * MUSIC_EMOJI.length)] : emoji,
+        glyph: glyphs[Math.floor(Math.random() * glyphs.length)],
         left: Math.random() * 100, // vw start
         drift: (Math.random() - 0.5) * 30, // vw horizontal drift
         delay: Math.random() * 0.5, // s

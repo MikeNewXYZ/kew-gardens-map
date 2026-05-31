@@ -75,6 +75,56 @@
   }
 }
 
+.subtitle {
+  margin-top: -8px;
+  font-family: var(--font-ui, sans-serif);
+  font-weight: 700;
+  font-size: clamp(0.9rem, 3.5vw, 1.3rem);
+  letter-spacing: 0.08em;
+  color: #ffd9d9;
+  text-transform: lowercase;
+}
+
+.tally {
+  font-family: var(--font-ui, sans-serif);
+  font-weight: 800;
+  font-size: 0.9rem;
+  letter-spacing: 0.16em;
+  color: #ffd23f;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 #000;
+}
+
+/* Flashing sirens in the top corners. */
+.siren,
+.sirenRight {
+  position: fixed;
+  top: calc(8px + var(--safe-top, 0px));
+  font-size: clamp(1.8rem, 7vw, 3rem);
+  animation: sirenFlash 0.6s steps(1) infinite;
+}
+
+.siren {
+  left: 12px;
+}
+
+.sirenRight {
+  right: 12px;
+  animation-delay: 0.3s;
+}
+
+@keyframes sirenFlash {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1.15) rotate(-8deg);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.9) rotate(8deg);
+  }
+}
+
 .videoWrap {
   position: relative;
   width: 100%;
@@ -118,7 +168,9 @@
 @media (prefers-reduced-motion: reduce) {
   .overlay,
   .shake,
-  .titleHuge {
+  .titleHuge,
+  .siren,
+  .sirenRight {
     animation: none;
   }
   .overlay {
