@@ -15,9 +15,11 @@ export interface Presence {
   lng?: number;
   lat?: number;
   lastSeen: number;
+  outsideSince?: number;
 }
 interface PresenceState {
   users: Record<string, Presence>;
+  lastResetDay?: string;
 }
 
 interface PresenceContextValue {

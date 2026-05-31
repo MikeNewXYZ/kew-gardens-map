@@ -29,7 +29,15 @@ export function createMap(container: HTMLElement): mapboxgl.Map {
   });
 
   map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
-  map.addControl(new mapboxgl.GeolocateControl({ trackUserLocation: true }), "top-right");
+  // Keep the "centre on me" button, but hide the native blue location dot — the
+  // visitor's own position is represented by their assigned presence emoji.
+  map.addControl(
+    new mapboxgl.GeolocateControl({
+      trackUserLocation: true,
+      showUserLocation: false,
+    }),
+    "top-right",
+  );
   map.addControl(new mapboxgl.ScaleControl({ unit: "metric" }), "bottom-left");
 
   return map;
