@@ -31,6 +31,7 @@ export interface Presence {
 }
 interface PresenceState {
   users: Record<string, Presence>;
+  onlineCount?: number;
   lastResetDay?: string;
 }
 
@@ -41,6 +42,8 @@ interface PresenceContextValue {
   myEmoji?: string;
   /** Everyone currently known to the presence room, keyed by id. */
   users: Record<string, Presence>;
+  /** Visitors with an open socket right now (the live count for the header). */
+  liveCount: number;
   /** Broadcast (or clear, with null) this visitor's active route as a ghost. */
   publishRoute: (route: GhostRoute | null) => void;
   /** Fire a celebration burst of this visitor's emoji for everyone. */
@@ -73,6 +76,7 @@ function loadUserId(): string {
 export function PresenceProvider({ children }: { children: ReactNode }) {
   const [userId] = useState(loadUserId);
   const [users, setUsers] = useState<Record<string, Presence>>({});
+  const [liveCount, setLiveCount] = useState(0);
   const [bursts, setBursts] = useState<Burst[]>([]);
   const burstSeq = useRef(0);
 
@@ -91,7 +95,10 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     agent: "PresenceAgent",
     name: "global",
     query: { userId },
-    onStateUpdate: (state) => setUsers(state?.users ?? {}),
+    onStateUpdate: (state) => {
+      setUsers(state?.users ?? {});
+      setLiveCount(state?.onlineCount ?? 0);
+    },
     // Custom (non-state) frames: a celebration broadcast from any visitor.
     onMessage: (event) => {
       try {
@@ -156,7 +163,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   return (
     <PresenceContext.Provider
-      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, publishRoute, celebrate }}
+      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, liveCount, publishRoute, celebrate }}
     >
       {children}
       <CelebrationOverlay bursts={bursts} />

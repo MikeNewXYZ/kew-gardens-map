@@ -85,6 +85,38 @@
   transform: scale(0.95);
 }
 
+/* The Morton button — a playful tune + haptic buzz. Sits under the 3D toggle. */
+.morton {
+  position: absolute;
+  top: 66px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1b4332;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.morton:hover {
+  background: #fff;
+}
+
+.morton:active {
+  transform: scale(0.93);
+}
+
 /* Navigation panel (active route) */
 .navPanel {
   position: absolute;

@@ -34,6 +34,8 @@ export interface Presence {
 
 export interface PresenceState {
   users: Record<string, Presence>;
+  /** Distinct visitors with an open socket right now (true "live" count). */
+  onlineCount?: number;
   /** London day of the last end-of-day location wipe. */
   lastResetDay?: string;
 }
@@ -125,6 +127,17 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
     }
   }
 
+  /** Distinct visitors with at least one open socket (optionally excluding one). */
+  private liveCount(excludeConnId?: string): number {
+    const ids = new Set<string>();
+    for (const c of this.getConnections<{ userId?: string }>()) {
+      if (c.id === excludeConnId) continue;
+      const id = c.state?.userId;
+      if (id) ids.add(id);
+    }
+    return ids.size;
+  }
+
   async onConnect(connection: Connection, ctx: ConnectionContext) {
     const userId = new URL(ctx.request.url).searchParams.get("userId");
     if (!userId) {
@@ -142,7 +155,13 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
           emoji: assignEmoji(userId, new Set(Object.values(users).map((u) => u.emoji))),
           lastSeen: Date.now(),
         };
-    this.setState({ users });
+    this.setState({ ...this.state, users, onlineCount: this.liveCount() });
+  }
+
+  // Keep the live count honest the moment a socket drops (the visitor's entry
+  // lingers for last-known location, but they're no longer "online").
+  async onClose(connection: Connection) {
+    this.setState({ ...this.state, onlineCount: this.liveCount(connection.id) });
   }
 
   async onMessage(connection: Connection, message: string | ArrayBuffer) {
@@ -258,6 +277,10 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
         next[id] = u;
       }
     }
-    if (changed) this.setState({ users: next, lastResetDay: today });
+    // Periodic correction for the live count (covers any missed close events).
+    if (this.state.onlineCount !== live.size) changed = true;
+    if (changed) {
+      this.setState({ users: next, lastResetDay: today, onlineCount: live.size });
+    }
   }
 }

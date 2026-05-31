@@ -18,6 +18,7 @@ import {
   type LngLat,
 } from "../lib/nav.ts";
 import { createMap } from "../map.ts";
+import { playMorton } from "../lib/morton.ts";
 import { usePresence } from "../lib/presence.tsx";
 import styles from "./MapView.module.css";
 
@@ -717,6 +718,18 @@ export function MapView() {
           title={threeD ? "Switch to 2D (top-down) view" : "Switch to 3D view"}
         >
           {threeD ? "2D" : "3D"}
+        </button>
+      )}
+
+      {mapReady && (
+        <button
+          type="button"
+          className={styles.morton}
+          onClick={playMorton}
+          title="The Morton button"
+          aria-label="The Morton button — plays a tune and buzzes"
+        >
+          🎵 The Morton Button
         </button>
       )}
 
