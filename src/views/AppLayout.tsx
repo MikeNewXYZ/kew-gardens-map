@@ -49,7 +49,7 @@ function TabIcon({ children }: { children: ReactNode }) {
 }
 
 export function AppLayout() {
-  const { myEmoji } = usePresence();
+  const { myEmoji, celebrate } = usePresence();
   return (
     <div className={styles.app}>
       <header className={styles.topbar}>
@@ -60,13 +60,16 @@ export function AppLayout() {
           <h1>Kew</h1>
           <p>Garden Map</p>
         </div>
-        <span
+        <button
+          type="button"
           className={styles.you}
-          title="You on the map"
-          aria-label={myEmoji ? `You are ${myEmoji}` : "Connecting…"}
+          onClick={celebrate}
+          disabled={!myEmoji}
+          title="Tap to celebrate — everyone sees it!"
+          aria-label={myEmoji ? `Celebrate as ${myEmoji}` : "Connecting…"}
         >
           {myEmoji ?? "…"}
-        </span>
+        </button>
       </header>
 
       <main className={styles.main}>

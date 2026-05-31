@@ -55,18 +55,36 @@
   color: var(--brass-bright);
 }
 
-/* Your assigned presence emoji — sits at the right edge of the header. */
+/* Your assigned presence emoji — tap it to celebrate for everyone. */
 .you {
   margin-left: auto;
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
+  padding: 0;
   font-size: 1.15rem;
   line-height: 1;
+  border: none;
   border-radius: 50%;
   background: rgba(244, 239, 225, 0.14);
   box-shadow: 0 0 0 1.5px var(--brass-bright) inset;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.you:hover:not(:disabled) {
+  background: rgba(244, 239, 225, 0.26);
+}
+
+.you:active:not(:disabled) {
+  transform: scale(0.88);
+}
+
+.you:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 .main {
