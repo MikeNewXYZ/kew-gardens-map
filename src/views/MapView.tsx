@@ -62,6 +62,7 @@ export function MapView() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [nav, setNav] = useState<NavInfo | null>(null);
   const [navError, setNavError] = useState<string | null>(null);
+  const [threeD, setThreeD] = useState(true); // map starts pitched (pitch 55)
 
   // Create the map + plant layers once.
   useEffect(() => {
@@ -444,6 +445,27 @@ export function MapView() {
     };
   }, [search.route, search.dest, search.destName]);
 
+  // Toggle between the pitched 3D view and a flat top-down 2D view.
+  function toggle3D() {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = !threeD;
+    setThreeD(next);
+    map.easeTo({ pitch: next ? 55 : 0, bearing: next ? -20 : 0, duration: 800 });
+  }
+
+  // Keep the button label honest if the user pitches manually (e.g. drag, or
+  // the NavigationControl): >10° counts as 3D.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    const onPitch = () => setThreeD(map.getPitch() > 10);
+    map.on("pitchend", onPitch);
+    return () => {
+      map.off("pitchend", onPitch);
+    };
+  }, [mapReady]);
+
   function endNavigation() {
     const map = mapRef.current;
     if (map) clearRoute(map, navMarkersRef);
@@ -457,6 +479,18 @@ export function MapView() {
       <div ref={containerRef} className={styles.map} />
 
       {loading && <div className={styles.loading}>Loading plants…</div>}
+
+      {mapReady && (
+        <button
+          type="button"
+          className={styles.viewToggle}
+          onClick={toggle3D}
+          aria-pressed={threeD}
+          title={threeD ? "Switch to 2D (top-down) view" : "Switch to 3D view"}
+        >
+          {threeD ? "2D" : "3D"}
+        </button>
+      )}
 
       {(nav || navError) && (
         <div className={styles.navPanel}>

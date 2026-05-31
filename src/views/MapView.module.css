@@ -49,6 +49,35 @@
   backdrop-filter: blur(4px);
 }
 
+/* 3D/2D view toggle */
+.viewToggle {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1b4332;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.viewToggle:hover {
+  background: #fff;
+}
+
+.viewToggle:active {
+  transform: scale(0.95);
+}
+
 /* Navigation panel (active route) */
 .navPanel {
   position: absolute;

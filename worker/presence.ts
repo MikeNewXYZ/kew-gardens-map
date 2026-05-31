@@ -186,13 +186,19 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
         changed = true;
         continue;
       }
-      // Expire the location if the day rolled over, or if they've been outside
-      // the gardens for more than 15 minutes. The identity (emoji) is kept.
+      const hasLocation = u.lng !== undefined || u.lat !== undefined;
       const expiredOutside =
         u.outsideSince !== undefined && now - u.outsideSince > OUTSIDE_TTL_MS;
-      if (wipeLocations || expiredOutside) {
-        if (u.lng !== undefined || u.lat !== undefined) changed = true;
+      if (wipeLocations) {
+        // End of day: clear the location AND the outside stamp (fresh start).
+        if (hasLocation || u.outsideSince !== undefined) changed = true;
         next[id] = { emoji: u.emoji, lastSeen: u.lastSeen };
+      } else if (expiredOutside) {
+        // Outside > 15 min: clear the location but KEEP the stamp sticky, so a
+        // continued stream of outside updates can't resurrect it (only coming
+        // back inside resets it). The identity (emoji) is kept.
+        if (hasLocation) changed = true;
+        next[id] = { emoji: u.emoji, lastSeen: u.lastSeen, outsideSince: u.outsideSince };
       } else {
         next[id] = u;
       }
