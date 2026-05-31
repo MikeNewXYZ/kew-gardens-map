@@ -6,7 +6,7 @@ export interface LocationProps {
   category: LocationCategory;
   kind: string;
   detail: string;
-  wikipedia?: string;
+  image?: string;
   website?: string;
 }
 
@@ -26,6 +26,7 @@ export interface LocationResult {
   category: LocationCategory;
   kind: string;
   detail: string;
+  image: string;
   lng: number;
   lat: number;
   score: number;
@@ -68,6 +69,7 @@ interface LocationDoc {
   category: LocationCategory;
   kind: string;
   detail: string;
+  image: string;
   lng: number;
   lat: number;
 }
@@ -85,7 +87,7 @@ export function createLocationIndex(
 ): MiniSearch<LocationDoc> {
   const mini = new MiniSearch<LocationDoc>({
     fields: ["name", "detail", "category", "kind"],
-    storeFields: ["name", "category", "kind", "detail", "lng", "lat"],
+    storeFields: ["name", "category", "kind", "detail", "image", "lng", "lat"],
     searchOptions: SEARCH_OPTIONS,
   });
   mini.addAll(
@@ -95,11 +97,29 @@ export function createLocationIndex(
       category: f.properties.category,
       kind: f.properties.kind,
       detail: f.properties.detail,
+      image: f.properties.image ?? "",
       lng: f.geometry.coordinates[0],
       lat: f.geometry.coordinates[1],
     })),
   );
   return mini;
+}
+
+/** All locations as results, sorted by name — used for the default browse view. */
+export async function listLocations(): Promise<LocationResult[]> {
+  const d = await loadLocations();
+  return d.features
+    .map((f): LocationResult => ({
+      name: f.properties.name,
+      category: f.properties.category,
+      kind: f.properties.kind,
+      detail: f.properties.detail,
+      image: f.properties.image ?? "",
+      lng: f.geometry.coordinates[0],
+      lat: f.geometry.coordinates[1],
+      score: 0,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 let indexPromise: Promise<MiniSearch<LocationDoc>> | null = null;
@@ -121,6 +141,7 @@ export async function searchLocations(query: string, limit = 20): Promise<Locati
     category: r.category as LocationCategory,
     kind: r.kind as string,
     detail: r.detail as string,
+    image: (r.image as string) ?? "",
     lng: r.lng as number,
     lat: r.lat as number,
     score: r.score,

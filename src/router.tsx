@@ -29,6 +29,8 @@ export interface MapSearch {
   focus?: string; // "lng,lat"
   name?: string;
   route?: string; // plant name to navigate to the nearest of
+  dest?: string; // "lng,lat" of a fixed destination (e.g. a location) to walk to
+  destName?: string; // label for the dest destination
 }
 
 const mapRoute = createRoute({
@@ -38,6 +40,8 @@ const mapRoute = createRoute({
     focus: typeof s.focus === "string" ? s.focus : undefined,
     name: typeof s.name === "string" ? s.name : undefined,
     route: typeof s.route === "string" ? s.route : undefined,
+    dest: typeof s.dest === "string" ? s.dest : undefined,
+    destName: typeof s.destName === "string" ? s.destName : undefined,
   }),
   component: MapView,
 });

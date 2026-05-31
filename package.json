@@ -10,11 +10,9 @@
     "scrape": "node scripts/scrape.mjs",
     "cf:typegen": "wrangler types",
     "cf:typecheck": "tsc --noEmit -p worker/tsconfig.json",
-    "cf:preview": "pnpm build && wrangler dev",
     "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
-    "@mapbox/mapbox-gl-directions": "^4.3.1",
     "@tanstack/react-router": "^1.95.0",
     "agents": "^0.13.3",
     "mapbox-gl": "^3.9.0",
@@ -26,6 +24,7 @@
     "react-zoom-pan-pinch": "^4.0.3"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.39.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

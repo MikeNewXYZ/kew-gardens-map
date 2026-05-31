@@ -1,4 +1,5 @@
 import { Agent, type Connection, type ConnectionContext } from "agents";
+import { KEW_BOUNDARY_RING } from "./kew-boundary.ts";
 
 /** How long a user's last-known location survives without them being live. */
 const TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -14,11 +15,6 @@ export interface Presence {
 
 export interface PresenceState {
   users: Record<string, Presence>;
-}
-
-/** Minimal shape of the Kew boundary GeoJSON we read from the static assets. */
-interface BoundaryGeoJSON {
-  features: { geometry: { coordinates: number[][][] } }[];
 }
 
 /** A location update pushed from a client over the WebSocket. */
@@ -75,9 +71,6 @@ function pointInRing(lng: number, lat: number, ring: [number, number][]): boolea
 export class PresenceAgent extends Agent<Env, PresenceState> {
   initialState: PresenceState = { users: {} };
 
-  // Lazily-loaded, then cached, Kew boundary ring (read from the static assets).
-  private ring: [number, number][] | null = null;
-
   async onStart() {
     // One recurring pruning alarm per instance (idempotent across wakes).
     if (this.getSchedules().length === 0) {
@@ -127,8 +120,7 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
       prev?.emoji ??
       assignEmoji(userId, new Set(Object.values(users).map((u) => u.emoji)));
 
-    const ring = await this.boundaryRing();
-    if (pointInRing(lng, lat, ring)) {
+    if (pointInRing(lng, lat, KEW_BOUNDARY_RING)) {
       users[userId] = { emoji, lng, lat, lastSeen: Date.now() };
     } else {
       // Outside the gardens — keep the visitor's identity but drop their marker.
@@ -157,15 +149,5 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
       else changed = true;
     }
     if (changed) this.setState({ users: next });
-  }
-
-  private async boundaryRing(): Promise<[number, number][]> {
-    if (this.ring) return this.ring;
-    const res = await this.env.ASSETS.fetch(
-      new Request("https://assets.local/kew-boundary.geojson"),
-    );
-    const gj = (await res.json()) as BoundaryGeoJSON;
-    this.ring = (gj.features[0]?.geometry.coordinates[0] as [number, number][]) ?? [];
-    return this.ring;
   }
 }

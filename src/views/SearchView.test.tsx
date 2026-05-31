@@ -12,6 +12,16 @@ vi.mock("../lib/search.ts", () => ({
   suggestTerms: (...a: unknown[]) => suggestTerms(...a),
 }));
 
+// SearchView also searches places; mock it out (returns no locations here).
+const searchLocations = vi.fn();
+const listLocations = vi.fn();
+vi.mock("../lib/locations.ts", () => ({
+  searchLocations: (...a: unknown[]) => searchLocations(...a),
+  listLocations: (...a: unknown[]) => listLocations(...a),
+  CATEGORY_ORDER: [],
+  CATEGORY_META: {},
+}));
+
 // Imported after the mocks are registered.
 const { SearchView } = await import("./SearchView.tsx");
 
@@ -27,6 +37,8 @@ beforeEach(() => {
   navigate.mockReset();
   searchPlants.mockReset().mockResolvedValue([GINKGO]);
   suggestTerms.mockReset().mockResolvedValue([]);
+  searchLocations.mockReset().mockResolvedValue([]);
+  listLocations.mockReset().mockResolvedValue([]);
 });
 
 describe("SearchView", () => {

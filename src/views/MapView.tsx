@@ -11,6 +11,7 @@ import {
   fetchWalkingRoute,
   formatDistance,
   formatDuration,
+  haversine,
   nearestNamed,
   resolveStart,
   type LngLat,
@@ -30,6 +31,7 @@ const idle = (cb: () => void) =>
     : window.setTimeout(cb, 1);
 
 interface NavInfo {
+  label: string; // "Nearest specimen" for plants, "Walking route" for places
   name: string;
   metres: number;
   seconds: number | null; // null when only a straight-line fallback is shown
@@ -41,6 +43,8 @@ export function MapView() {
     focus?: string;
     name?: string;
     route?: string;
+    dest?: string;
+    destName?: string;
   };
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -345,12 +349,14 @@ export function MapView() {
     else map.once("load", go);
   }, [search.focus, search.name]);
 
-  // Navigate: find the nearest specimen of search.route and draw a walking route.
+  // Navigate: draw a walking route from the visitor's GPS to either the nearest
+  // specimen of a plant (search.route) or a fixed location (search.dest).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const targetName = search.route;
-    if (!targetName) {
+    const routeName = search.route;
+    const destStr = search.dest;
+    if (!routeName && !destStr) {
       clearRoute(map, navMarkersRef);
       setNav(null);
       setNavError(null);
@@ -362,30 +368,54 @@ export function MapView() {
 
     async function run() {
       // Always start from the visitor's real GPS position.
-      const [from, data] = await Promise.all([resolveStart(), loadPlants()]);
+      const from = await resolveStart();
       if (cancelled || !map) return;
-
       if (!from) {
         setNav(null);
         setNavError("Couldn't get your location — enable location access to navigate.");
         return;
       }
 
-      // Geometric narrowing (nearest as the crow flies), then route the winner.
-      const dest = nearestNamed(from, data, targetName!);
-      if (!dest) {
-        setNav(null);
-        setNavError(`Couldn't find “${targetName}” in the collection.`);
-        return;
+      let destCoords: LngLat;
+      let destName: string;
+      let label: string;
+      let straightMetres: number;
+
+      if (routeName) {
+        // Geometric narrowing (nearest as the crow flies), then route the winner.
+        const data = await loadPlants();
+        if (cancelled || !map) return;
+        const hit = nearestNamed(from, data, routeName);
+        if (!hit) {
+          setNav(null);
+          setNavError(`Couldn't find “${routeName}” in the collection.`);
+          return;
+        }
+        destCoords = hit.coords;
+        destName = hit.name;
+        label = "Nearest specimen";
+        straightMetres = hit.metres;
+      } else {
+        const [lng, lat] = destStr!.split(",").map(Number);
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+          setNav(null);
+          setNavError("Invalid destination.");
+          return;
+        }
+        destCoords = [lng, lat];
+        destName = search.destName ?? "Destination";
+        label = "Walking route";
+        straightMetres = haversine(from, destCoords);
       }
 
-      const route = await fetchWalkingRoute(from, dest.coords);
+      const route = await fetchWalkingRoute(from, destCoords);
       if (cancelled || !map) return;
 
-      drawRoute(map, navMarkersRef, from, dest.coords, dest.name, route?.geometry);
+      drawRoute(map, navMarkersRef, from, destCoords, destName, route?.geometry);
       setNav({
-        name: dest.name,
-        metres: route?.metres ?? dest.metres,
+        label,
+        name: destName,
+        metres: route?.metres ?? straightMetres,
         seconds: route?.seconds ?? null,
       });
     }
@@ -396,7 +426,7 @@ export function MapView() {
     return () => {
       cancelled = true;
     };
-  }, [search.route]);
+  }, [search.route, search.dest, search.destName]);
 
   function endNavigation() {
     const map = mapRef.current;
@@ -416,7 +446,7 @@ export function MapView() {
         <div className={styles.navPanel}>
           {nav ? (
             <div className={styles.navBody}>
-              <div className={styles.navLabel}>Nearest specimen</div>
+              <div className={styles.navLabel}>{nav.label}</div>
               <div className={styles.navName}>{nav.name}</div>
               <div className={styles.navStats}>
                 {formatDistance(nav.metres)}

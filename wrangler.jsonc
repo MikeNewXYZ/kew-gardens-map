@@ -6,9 +6,10 @@
   // Required by the Agents SDK.
   "compatibility_flags": ["nodejs_compat"],
 
-  // Static SPA assets (the Vite build output).
+  // Static SPA assets. `directory` is intentionally omitted — the Cloudflare
+  // Vite plugin auto-populates it (pointing at the client build) when you run
+  // `vite build`, and writes a deploy-ready wrangler.json into the output.
   "assets": {
-    "directory": "./dist",
     // Lets the Worker fall back to assets via env.ASSETS.fetch().
     "binding": "ASSETS",
     // TanStack Router does client-side routing, so unmatched paths (e.g. /map,

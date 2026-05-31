@@ -275,12 +275,31 @@
 }
 
 /* ---------- Location card ---------- */
-.locDot {
+.thumb {
+  position: relative;
   flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  width: 52px;
+  height: 52px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--paper-sunk);
+  border: 1px solid var(--rule);
+  display: grid;
+  place-items: center;
+}
+
+.thumbImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbGlyph {
+  font-size: 1.3rem;
+  line-height: 1;
+  opacity: 0.65;
 }
 
 .locBody {

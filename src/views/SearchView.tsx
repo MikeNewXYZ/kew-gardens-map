@@ -4,6 +4,7 @@ import { highlightMatch } from "../lib/highlight.tsx";
 import {
   CATEGORY_META,
   CATEGORY_ORDER,
+  listLocations,
   searchLocations,
   type LocationResult,
 } from "../lib/locations.ts";
@@ -28,6 +29,7 @@ export function SearchView() {
   const [query, setQuery] = useState("");
   const [plants, setPlants] = useState<SpeciesResult[]>([]);
   const [locations, setLocations] = useState<LocationResult[]>([]);
+  const [browse, setBrowse] = useState<LocationResult[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
@@ -35,6 +37,11 @@ export function SearchView() {
 
   const debounced = useDebounced(query, 160);
   const hasQuery = debounced.trim().length >= 2;
+
+  // Load every location once so the gardens browse by default (no query needed).
+  useEffect(() => {
+    listLocations().then(setBrowse).catch((e) => console.error(e));
+  }, []);
 
   // Run plant + location search whenever the debounced query changes (race-safe).
   useEffect(() => {
@@ -62,10 +69,14 @@ export function SearchView() {
     };
   }, [debounced, hasQuery]);
 
+  // With a query: searched results. Without: browse every location by category.
+  const locResults = hasQuery ? locations : browse;
+  const plantResults = hasQuery ? plants : [];
+
   // Build category sections (locations first, by category order; plants last).
   const sections: Section[] = [];
   for (const cat of CATEGORY_ORDER) {
-    const items = locations.filter((l) => l.category === cat);
+    const items = locResults.filter((l) => l.category === cat);
     if (items.length) {
       sections.push({
         key: cat,
@@ -76,13 +87,13 @@ export function SearchView() {
       });
     }
   }
-  if (plants.length) {
+  if (plantResults.length) {
     sections.push({
       key: "plants",
       heading: "Plants",
       color: "#1b4332",
       kind: "plant",
-      items: plants.map((plant) => ({ type: "plant", plant })),
+      items: plantResults.map((plant) => ({ type: "plant", plant })),
     });
   }
   const flat = sections.flatMap((s) => s.items);
@@ -124,8 +135,8 @@ export function SearchView() {
     }
   }
 
-  const showResults = hasQuery && flat.length > 0;
-  const total = plants.length + locations.length;
+  const showResults = flat.length > 0;
+  const total = plantResults.length + locResults.length;
   let idx = -1; // running flat index across sections
 
   return (
@@ -160,11 +171,11 @@ export function SearchView() {
         <div className={styles.status} aria-live="polite">
           {loading
             ? "Searching…"
-            : showResults
-              ? `${total} result${total === 1 ? "" : "s"}`
-              : hasQuery
-                ? "No matches"
-                : "Plants · glasshouses · gardens · galleries · gates"}
+            : hasQuery
+              ? showResults
+                ? `${total} result${total === 1 ? "" : "s"}`
+                : "No matches"
+              : `${browse.length} places to explore · search for plants`}
         </div>
       </div>
 
@@ -194,7 +205,22 @@ export function SearchView() {
                       onMouseEnter={() => setActive(i)}
                       onClick={() => select(item)}
                     >
-                      <span className={styles.locDot} style={{ background: meta.color }} />
+                      <span className={styles.thumb}>
+                        <span className={styles.thumbGlyph} style={{ color: meta.color }} aria-hidden>
+                          ❧
+                        </span>
+                        {item.loc.image && (
+                          <img
+                            className={styles.thumbImg}
+                            src={item.loc.image}
+                            alt=""
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        )}
+                      </span>
                       <span className={styles.locBody}>
                         <span className={styles.locName}>{highlightMatch(item.loc.name, debounced)}</span>
                         <span className={styles.locDetail}>{item.loc.detail || meta.label}</span>
@@ -252,7 +278,7 @@ export function SearchView() {
           </div>
         )}
 
-        {!hasQuery && (
+        {!hasQuery && browse.length === 0 && (
           <div className={styles.hint}>
             <p>Find anything at Kew.</p>
             <p className={styles.hintSub}>

@@ -132,6 +132,78 @@ function describe(tags, kind) {
   return map[kind] ?? (kind ? kind.replace(/_/g, " ") : "");
 }
 
+const UA = "kew-gardens-map/0.1 (personal mapping project)";
+const commonsThumb = (file) =>
+  `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file.replace(/^File:/i, ""))}?width=480`;
+
+async function getJson(url) {
+  const r = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
+  if (!r.ok) throw new Error(`HTTP ${r.status} for ${url}`);
+  return r.json();
+}
+
+// Resolve a thumbnail URL for each feature, in order of preference:
+// image tag -> wikimedia_commons -> Wikidata P18 -> Wikipedia pageimage.
+async function resolveImages(features) {
+  // Wikidata P18 (batched, 45 ids/call).
+  const qids = [...new Set(features.map((f) => f._wikidata).filter(Boolean))];
+  const qImage = {};
+  for (let i = 0; i < qids.length; i += 45) {
+    const batch = qids.slice(i, i + 45).join("|");
+    try {
+      const j = await getJson(
+        `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${batch}&props=claims&format=json&origin=*`,
+      );
+      for (const [qid, ent] of Object.entries(j.entities ?? {})) {
+        const p18 = ent.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+        if (p18) qImage[qid] = p18;
+      }
+    } catch (e) {
+      console.warn("  wikidata batch failed:", e.message);
+    }
+  }
+
+  const validCommons = (c) => c && /^File:/i.test(c);
+
+  // Wikipedia pageimages for whatever is still uncovered (grouped by language).
+  const byLang = {};
+  for (const f of features) {
+    if (f._image || validCommons(f._commons) || (f._wikidata && qImage[f._wikidata])) continue;
+    const m = /^([a-z]{2,3}):(.+)$/.exec(f._wikipedia || "");
+    if (m) (byLang[m[1]] ??= new Map()).set(m[2], f);
+  }
+  for (const [lang, map] of Object.entries(byLang)) {
+    const titles = [...map.keys()];
+    for (let i = 0; i < titles.length; i += 40) {
+      const batch = titles.slice(i, i + 40).map(encodeURIComponent).join("|");
+      try {
+        const j = await getJson(
+          `https://${lang}.wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=480&format=json&origin=*&titles=${batch}`,
+        );
+        for (const page of Object.values(j.query?.pages ?? {})) {
+          const f = map.get(page.title);
+          if (f && page.thumbnail?.source) f.properties.image = page.thumbnail.source;
+        }
+      } catch (e) {
+        console.warn(`  wikipedia(${lang}) batch failed:`, e.message);
+      }
+    }
+  }
+
+  // Apply preference order; strip the scratch fields.
+  for (const f of features) {
+    if (!f.properties.image) {
+      if (f._image && /^https?:\/\//.test(f._image)) f.properties.image = f._image;
+      else if (validCommons(f._commons)) f.properties.image = commonsThumb(f._commons);
+      else if (f._wikidata && qImage[f._wikidata]) f.properties.image = commonsThumb(qImage[f._wikidata]);
+    }
+    delete f._wikidata;
+    delete f._commons;
+    delete f._image;
+    delete f._wikipedia;
+  }
+}
+
 async function main() {
   const boundary = JSON.parse(await readFile(BOUNDARY, "utf8"));
   const geom = (boundary.features?.[0] ?? boundary).geometry;
@@ -173,9 +245,14 @@ async function main() {
         category: cat.category,
         kind: cat.kind,
         detail: describe(el.tags, cat.kind),
-        wikipedia: el.tags.wikipedia ?? "",
+        image: "",
         website: el.tags.website ?? el.tags["contact:website"] ?? "",
       },
+      // Raw image references, resolved below then stripped.
+      _wikidata: el.tags.wikidata ?? "",
+      _commons: el.tags.wikimedia_commons ?? "",
+      _image: el.tags.image ?? "",
+      _wikipedia: el.tags.wikipedia ?? "",
     });
   }
 
@@ -190,11 +267,15 @@ async function main() {
   }
   features.sort((a, b) => a.properties.name.localeCompare(b.properties.name));
 
+  console.log("Resolving images…");
+  await resolveImages(features);
+
   const counts = {};
   for (const f of features) counts[f.properties.category] = (counts[f.properties.category] ?? 0) + 1;
+  const withImg = features.filter((f) => f.properties.image).length;
 
   await writeFile(OUT, JSON.stringify({ type: "FeatureCollection", features }, null, 0));
-  console.log(`Wrote ${features.length} locations -> ${OUT}`);
+  console.log(`Wrote ${features.length} locations (${withImg} with images) -> ${OUT}`);
   console.log("By category:", counts);
 }
 
