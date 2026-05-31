@@ -117,25 +117,26 @@
   transform: scale(0.93);
 }
 
-/* The Fail button — small, red, sits just above the Morton button. */
+/* The Fail button — big and bold, above the Morton button. */
 .failBtn {
   position: absolute;
-  bottom: calc(72px + var(--safe-bottom));
+  bottom: calc(96px + var(--safe-bottom));
   left: calc(12px + var(--safe-left));
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 13px;
-  border: none;
+  gap: 10px;
+  padding: 16px 26px;
+  border: 3px solid #fff;
   border-radius: 999px;
   background: #c0392b;
   color: #fff;
-  font-size: 0.74rem;
+  font-size: 1.25rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 6px 22px rgba(192, 57, 43, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 5;
   transition: transform 0.1s ease, background 0.15s ease;
   -webkit-tap-highlight-color: transparent;
@@ -146,7 +147,7 @@
 }
 
 .failBtn:active {
-  transform: scale(0.92);
+  transform: scale(0.94);
 }
 
 /* Navigation panel (active route) */
