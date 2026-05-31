@@ -10,7 +10,6 @@
 
 /* ---------- Live visitor presence markers ---------- */
 .presence {
-  position: relative;
   display: grid;
   place-items: center;
   width: 30px;
@@ -23,24 +22,9 @@
   cursor: pointer;
 }
 
-/* Ring around the marker, marking a last-known location. */
-.presence::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 2px solid rgba(27, 67, 50, 0.5); /* forest */
-  pointer-events: none;
-}
-
-/* Your own ring picks up the brass accent so you can pick yourself out. */
-.presenceSelf::after {
-  border-color: var(--brass, #b9892f);
-  border-width: 3px;
+/* Your own marker gets a brass ring so you can pick yourself out. */
+.presenceSelf {
+  box-shadow: 0 0 0 2.5px var(--brass, #b9892f), 0 1px 5px rgba(0, 0, 0, 0.4);
 }
 
 /* Loading badge */

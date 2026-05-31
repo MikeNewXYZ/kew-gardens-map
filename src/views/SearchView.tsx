@@ -158,7 +158,7 @@ export function SearchView() {
           <input
             className={styles.input}
             type="text"
-            placeholder="Search plants & places — Palm House, oak, café"
+            placeholder="Search plants and places, like the Palm House or an oak"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
@@ -181,7 +181,7 @@ export function SearchView() {
               ? showResults
                 ? `${total} result${total === 1 ? "" : "s"}`
                 : "No matches"
-              : `${browse.length} places to explore · search for plants`}
+              : `${browse.length} places to explore, or search for a plant`}
         </div>
       </div>
 
