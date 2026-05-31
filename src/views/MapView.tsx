@@ -395,7 +395,7 @@ export function MapView() {
       if (cancelled || !map) return;
       if (!from) {
         setNav(null);
-        setNavError("Couldn't get your location — enable location access to navigate.");
+        setNavError("Couldn't get your location. Turn on location access to navigate.");
         return;
       }
 
