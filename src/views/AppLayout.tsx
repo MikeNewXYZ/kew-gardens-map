@@ -1,6 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-import { usePresence } from "../lib/presence.tsx";
+import { useRef, useState, type ReactNode } from "react";
+import { EMOJI_CHOICES, usePresence } from "../lib/presence.tsx";
 import styles from "./AppLayout.module.css";
 
 const ICON = {
@@ -49,7 +49,35 @@ function TabIcon({ children }: { children: ReactNode }) {
 }
 
 export function AppLayout() {
-  const { myEmoji, celebrate, liveCount } = usePresence();
+  const { myEmoji, celebrate, liveCount, setEmoji } = usePresence();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Press-and-hold (500ms) opens the avatar picker; a short tap celebrates.
+  const holdTimer = useRef<number | null>(null);
+  const heldOpened = useRef(false);
+
+  function startHold() {
+    heldOpened.current = false;
+    holdTimer.current = window.setTimeout(() => {
+      heldOpened.current = true;
+      setMenuOpen(true);
+      navigator.vibrate?.(15); // subtle cue that the picker opened
+    }, 500);
+  }
+  function cancelHold() {
+    if (holdTimer.current != null) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  }
+  function onYouClick() {
+    if (heldOpened.current) {
+      heldOpened.current = false; // this "click" ends a long press — don't celebrate
+      return;
+    }
+    celebrate();
+  }
+
   return (
     <div className={styles.app}>
       <header className={styles.topbar}>
@@ -71,16 +99,62 @@ export function AppLayout() {
               {liveCount} live
             </span>
           )}
-          <button
-            type="button"
-            className={styles.you}
-            onClick={celebrate}
-            disabled={!myEmoji}
-            title="Tap to celebrate — everyone sees it!"
-            aria-label={myEmoji ? `Celebrate as ${myEmoji}` : "Connecting…"}
-          >
-            {myEmoji ?? "…"}
-          </button>
+          <div className={styles.youWrap}>
+            <button
+              type="button"
+              className={styles.you}
+              onPointerDown={startHold}
+              onPointerUp={cancelHold}
+              onPointerLeave={cancelHold}
+              onPointerCancel={cancelHold}
+              onClick={onYouClick}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={!myEmoji}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              title="Tap to celebrate · hold to change your avatar"
+              aria-label={myEmoji ? `You are ${myEmoji}. Tap to celebrate, hold to change avatar` : "Connecting…"}
+            >
+              {myEmoji ?? "…"}
+            </button>
+
+            {menuOpen && (
+              <>
+                <div className={styles.menuBackdrop} onClick={() => setMenuOpen(false)} />
+                <div className={styles.youMenu} role="menu">
+                  <div className={styles.youMenuTitle}>Your avatar</div>
+                  <div className={styles.emojiGrid}>
+                    {EMOJI_CHOICES.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={e === myEmoji}
+                        className={`${styles.emojiChoice} ${e === myEmoji ? styles.emojiChoiceActive : ""}`}
+                        onClick={() => {
+                          setEmoji(e);
+                          setMenuOpen(false);
+                        }}
+                        aria-label={`Use ${e}`}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.celebrateBtn}
+                    onClick={() => {
+                      celebrate();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    🎉 Celebrate
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 

@@ -62,12 +62,18 @@ interface CelebrateMessage {
 interface MortonMessage {
   type: "morton";
 }
+/** Visitor picks a different avatar emoji for themselves. */
+interface SetEmojiMessage {
+  type: "setEmoji";
+  emoji: string;
+}
 type ClientMessage =
   | LocMessage
   | NavMessage
   | NavEndMessage
   | CelebrateMessage
-  | MortonMessage;
+  | MortonMessage
+  | SetEmojiMessage;
 
 /** Uniformly downsample a route to a fixed budget, always keeping both ends. */
 function downsampleRoute(coords: [number, number][]): [number, number][] {
@@ -86,6 +92,9 @@ const EMOJI_POOL = [
   "🌼", "🍄", "🌿", "🍀", "🌸", "💐", "🌺", "🪻", "🪷", "🐌",
   "🦫", "🐇", "🦥", "🐠", "🐳", "🦭", "🍁", "🌴", "🐬", "🦚",
 ];
+
+/** Emojis a visitor is allowed to pick (must match the client's picker). */
+const EMOJI_SET = new Set(EMOJI_POOL);
 
 /** Stable fallback when every emoji in the pool is already taken. */
 function hashIndex(userId: string): number {
@@ -203,6 +212,15 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
       // Ephemeral musical-note burst for the whole room.
       const msg = JSON.stringify({ type: "morton", userId });
       for (const conn of this.getConnections()) conn.send(msg);
+      return;
+    }
+
+    if (data.type === "setEmoji") {
+      // Only allow emojis from the known pool; the state broadcast then updates
+      // this visitor's marker/header for everyone.
+      if (typeof data.emoji !== "string" || !EMOJI_SET.has(data.emoji)) return;
+      users[userId] = { ...(prev ?? { lastSeen: now }), emoji: data.emoji, lastSeen: now };
+      this.setState({ ...this.state, users });
       return;
     }
 

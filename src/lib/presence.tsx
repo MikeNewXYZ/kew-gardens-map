@@ -16,6 +16,16 @@ const CELEBRATION_MS = 3200;
 // Emoji particles per burst.
 const PARTICLE_COUNT = 26;
 
+// Avatar emojis a visitor can pick. MUST stay in sync with EMOJI_POOL in
+// worker/presence.ts (the server rejects anything outside this set).
+export const EMOJI_CHOICES = [
+  "🦊", "🦉", "🦋", "🐝", "🐞", "🦔", "🐢", "🦆", "🦢", "🐿️",
+  "🦜", "🐸", "🦚", "🦩", "🐥", "🦡", "🦦", "🌻", "🌷", "🌹",
+  "🌼", "🍄", "🌿", "🍀", "🌸", "💐", "🌺", "🪻", "🪷", "🐌",
+  "🦫", "🐇", "🦥", "🐠", "🐳", "🦭", "🍁", "🌴", "🐬",
+];
+const EMOJI_KEY = "kew-presence-emoji";
+
 // Mirrors the server-side shape in worker/presence.ts (kept in sync by hand to
 // avoid pulling the Worker's build graph into the client bundle).
 export interface GhostRoute {
@@ -50,6 +60,8 @@ interface PresenceContextValue {
   celebrate: () => void;
   /** Fire a musical-note burst (the Morton button) for everyone. */
   mortonForEveryone: () => void;
+  /** Choose a different avatar emoji (from EMOJI_CHOICES); persists + broadcasts. */
+  setEmoji: (emoji: string) => void;
 }
 
 interface Burst {
@@ -86,6 +98,8 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   // Keep the latest fix + route so we can (re)send them as soon as the socket opens.
   const lastLoc = useRef<string | null>(null);
   const lastRoute = useRef<string | null>(null);
+  // A chosen avatar emoji persists across sessions and is re-applied on connect.
+  const chosenEmoji = useRef<string | null>(localStorage.getItem(EMOJI_KEY));
 
   // Spawn a celebration burst that auto-clears after the animation finishes.
   const triggerBurst = useCallback((emoji: string, musical = false) => {
@@ -131,6 +145,19 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     }
   }, [socket]);
 
+  // Pick a new avatar emoji: persist it and tell the room (the state broadcast
+  // updates this visitor's marker + header everywhere).
+  const setEmoji = useCallback(
+    (emoji: string) => {
+      chosenEmoji.current = emoji;
+      localStorage.setItem(EMOJI_KEY, emoji);
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "setEmoji", emoji }));
+      }
+    },
+    [socket],
+  );
+
   // Broadcast (or clear) this visitor's active navigation route.
   const publishRoute = useCallback(
     (route: GhostRoute | null) => {
@@ -144,9 +171,12 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     [socket],
   );
 
-  // Flush the most recent location + active route once (re)connected.
+  // Flush the most recent location + route + chosen emoji once (re)connected.
   useEffect(() => {
     const flush = () => {
+      if (chosenEmoji.current) {
+        socket.send(JSON.stringify({ type: "setEmoji", emoji: chosenEmoji.current }));
+      }
       if (lastLoc.current) socket.send(lastLoc.current);
       if (lastRoute.current) socket.send(lastRoute.current);
     };
@@ -175,7 +205,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   return (
     <PresenceContext.Provider
-      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, liveCount, publishRoute, celebrate, mortonForEveryone }}
+      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, liveCount, publishRoute, celebrate, mortonForEveryone, setEmoji }}
     >
       {children}
       <CelebrationOverlay bursts={bursts} />
