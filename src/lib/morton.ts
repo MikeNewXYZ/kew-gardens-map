@@ -16,23 +16,36 @@ function playNotes() {
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     if (!ctx) ctx = new AC();
-    if (ctx.state === "suspended") void ctx.resume();
+    const audio = ctx;
 
-    const start = ctx.currentTime;
-    NOTES.forEach((freq, i) => {
-      const t = start + (i * NOTE_MS) / 1000;
-      const osc = ctx!.createOscillator();
-      const gain = ctx!.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = freq;
-      // Plucked envelope: fast attack, exponential decay.
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
-      osc.connect(gain).connect(ctx!.destination);
-      osc.start(t);
-      osc.stop(t + 0.26);
-    });
+    const schedule = () => {
+      // Small lead so the first note isn't scheduled in the past (which some
+      // browsers drop), and route everything through one master gain.
+      const start = audio.currentTime + 0.06;
+      const master = audio.createGain();
+      master.gain.value = 0.5;
+      master.connect(audio.destination);
+
+      NOTES.forEach((freq, i) => {
+        const t = start + (i * NOTE_MS) / 1000;
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, t);
+        // Plucked envelope: fast attack, exponential decay.
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.6, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+        osc.connect(gain).connect(master);
+        osc.start(t);
+        osc.stop(t + 0.28);
+      });
+    };
+
+    // A freshly-created context starts "suspended" until resumed — schedule the
+    // notes only once it's actually running, or they never sound.
+    if (audio.state === "suspended") audio.resume().then(schedule).catch(() => {});
+    else schedule();
   } catch {
     // Audio unsupported / blocked — stay silent.
   }

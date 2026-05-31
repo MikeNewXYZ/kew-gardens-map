@@ -77,7 +77,7 @@ export function MapView() {
   const navMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const presenceMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const ghostMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
-  const { myId, users, publishRoute } = usePresence();
+  const { myId, users, publishRoute, mortonForEveryone } = usePresence();
 
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
@@ -725,9 +725,12 @@ export function MapView() {
         <button
           type="button"
           className={styles.morton}
-          onClick={playMorton}
+          onClick={() => {
+            playMorton(); // local tune + haptic buzz for the presser
+            mortonForEveryone(); // musical-note burst for the whole room
+          }}
           title="The Morton button"
-          aria-label="The Morton button — plays a tune and buzzes"
+          aria-label="The Morton button — plays a tune, buzzes, and rains notes for everyone"
         >
           🎵 The Morton Button
         </button>

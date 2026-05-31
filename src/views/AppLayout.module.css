@@ -55,9 +55,16 @@
   color: var(--brass-bright);
 }
 
-/* Live-visitor count — pushed to the right edge; the emoji sits just after it. */
-.live {
+/* Right-aligned group: live count + your emoji, always at the far right. */
+.headerRight {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Live-visitor count pill. */
+.live {
   display: inline-flex;
   align-items: center;
   gap: 6px;

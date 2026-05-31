@@ -60,26 +60,28 @@ export function AppLayout() {
           <h1>Kew</h1>
           <p>Garden Map</p>
         </div>
-        {liveCount > 0 && (
-          <span
-            className={styles.live}
-            title={`${liveCount} ${liveCount === 1 ? "person" : "people"} exploring right now`}
-            aria-label={`${liveCount} live ${liveCount === 1 ? "visitor" : "visitors"}`}
+        <div className={styles.headerRight}>
+          {liveCount > 0 && (
+            <span
+              className={styles.live}
+              title={`${liveCount} ${liveCount === 1 ? "person" : "people"} exploring right now`}
+              aria-label={`${liveCount} live ${liveCount === 1 ? "visitor" : "visitors"}`}
+            >
+              <span className={styles.liveDot} aria-hidden />
+              {liveCount} live
+            </span>
+          )}
+          <button
+            type="button"
+            className={styles.you}
+            onClick={celebrate}
+            disabled={!myEmoji}
+            title="Tap to celebrate — everyone sees it!"
+            aria-label={myEmoji ? `Celebrate as ${myEmoji}` : "Connecting…"}
           >
-            <span className={styles.liveDot} aria-hidden />
-            {liveCount} live
-          </span>
-        )}
-        <button
-          type="button"
-          className={styles.you}
-          onClick={celebrate}
-          disabled={!myEmoji}
-          title="Tap to celebrate — everyone sees it!"
-          aria-label={myEmoji ? `Celebrate as ${myEmoji}` : "Connecting…"}
-        >
-          {myEmoji ?? "…"}
-        </button>
+            {myEmoji ?? "…"}
+          </button>
+        </div>
       </header>
 
       <main className={styles.main}>

@@ -48,11 +48,14 @@ interface PresenceContextValue {
   publishRoute: (route: GhostRoute | null) => void;
   /** Fire a celebration burst of this visitor's emoji for everyone. */
   celebrate: () => void;
+  /** Fire a musical-note burst (the Morton button) for everyone. */
+  mortonForEveryone: () => void;
 }
 
 interface Burst {
   id: number;
   emoji: string;
+  musical?: boolean; // render random musical-note emoji instead of `emoji`
 }
 
 const PresenceContext = createContext<PresenceContextValue | null>(null);
@@ -85,9 +88,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const lastRoute = useRef<string | null>(null);
 
   // Spawn a celebration burst that auto-clears after the animation finishes.
-  const triggerBurst = useCallback((emoji: string) => {
+  const triggerBurst = useCallback((emoji: string, musical = false) => {
     const id = (burstSeq.current += 1);
-    setBursts((b) => [...b, { id, emoji }]);
+    setBursts((b) => [...b, { id, emoji, musical }]);
     setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), CELEBRATION_MS);
   }, []);
 
@@ -99,12 +102,14 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       setUsers(state?.users ?? {});
       setLiveCount(state?.onlineCount ?? 0);
     },
-    // Custom (non-state) frames: a celebration broadcast from any visitor.
+    // Custom (non-state) frames: celebration / Morton broadcasts from anyone.
     onMessage: (event) => {
       try {
         const data = JSON.parse(event.data as string) as { type?: string; emoji?: string };
         if (data.type === "celebrate" && typeof data.emoji === "string") {
           triggerBurst(data.emoji);
+        } else if (data.type === "morton") {
+          triggerBurst("🎵", true);
         }
       } catch {
         // internal agent frames / non-JSON — ignore
@@ -116,6 +121,13 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const celebrate = useCallback(() => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: "celebrate" }));
+    }
+  }, [socket]);
+
+  // Morton button: rain musical notes for everyone in the room.
+  const mortonForEveryone = useCallback(() => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "morton" }));
     }
   }, [socket]);
 
@@ -163,7 +175,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   return (
     <PresenceContext.Provider
-      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, liveCount, publishRoute, celebrate }}
+      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, liveCount, publishRoute, celebrate, mortonForEveryone }}
     >
       {children}
       <CelebrationOverlay bursts={bursts} />
@@ -177,17 +189,20 @@ function CelebrationOverlay({ bursts }: { bursts: Burst[] }) {
   return (
     <div className={celebrationStyles.overlay} aria-hidden>
       {bursts.map((b) => (
-        <EmojiBurst key={b.id} emoji={b.emoji} />
+        <EmojiBurst key={b.id} emoji={b.emoji} musical={b.musical} />
       ))}
     </div>
   );
 }
 
-function EmojiBurst({ emoji }: { emoji: string }) {
+const MUSIC_EMOJI = ["🎵", "🎶", "🎼", "🎹", "🎺", "🎷", "🥁", "🎸"];
+
+function EmojiBurst({ emoji, musical }: { emoji: string; musical?: boolean }) {
   // Randomised once per burst so particles don't reshuffle on re-render.
   const particles = useMemo(
     () =>
       Array.from({ length: PARTICLE_COUNT }, () => ({
+        glyph: musical ? MUSIC_EMOJI[Math.floor(Math.random() * MUSIC_EMOJI.length)] : emoji,
         left: Math.random() * 100, // vw start
         drift: (Math.random() - 0.5) * 30, // vw horizontal drift
         delay: Math.random() * 0.5, // s
@@ -195,6 +210,7 @@ function EmojiBurst({ emoji }: { emoji: string }) {
         rot: (Math.random() - 0.5) * 720, // deg
         size: 1.4 + Math.random() * 1.6, // rem
       })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
   return (
@@ -214,7 +230,7 @@ function EmojiBurst({ emoji }: { emoji: string }) {
             } as React.CSSProperties
           }
         >
-          {emoji}
+          {p.glyph}
         </span>
       ))}
     </>

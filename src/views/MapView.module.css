@@ -85,11 +85,11 @@
   transform: scale(0.95);
 }
 
-/* The Morton button — a playful tune + haptic buzz. Sits under the 3D toggle. */
+/* The Morton button — a playful tune + haptic buzz. Bottom-left, above the scale. */
 .morton {
   position: absolute;
-  top: 66px;
-  left: 14px;
+  bottom: calc(30px + var(--safe-bottom));
+  left: calc(12px + var(--safe-left));
   display: inline-flex;
   align-items: center;
   gap: 6px;

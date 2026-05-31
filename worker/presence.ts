@@ -58,7 +58,16 @@ interface NavEndMessage {
 interface CelebrateMessage {
   type: "celebrate";
 }
-type ClientMessage = LocMessage | NavMessage | NavEndMessage | CelebrateMessage;
+/** The Morton button: rain musical notes for everyone (ephemeral). */
+interface MortonMessage {
+  type: "morton";
+}
+type ClientMessage =
+  | LocMessage
+  | NavMessage
+  | NavEndMessage
+  | CelebrateMessage
+  | MortonMessage;
 
 /** Uniformly downsample a route to a fixed budget, always keeping both ends. */
 function downsampleRoute(coords: [number, number][]): [number, number][] {
@@ -186,6 +195,13 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
       // Ephemeral: fan the celebration out to everyone (sender included) without
       // touching state, so each client can play the burst animation.
       const msg = JSON.stringify({ type: "celebrate", emoji, userId });
+      for (const conn of this.getConnections()) conn.send(msg);
+      return;
+    }
+
+    if (data.type === "morton") {
+      // Ephemeral musical-note burst for the whole room.
+      const msg = JSON.stringify({ type: "morton", userId });
       for (const conn of this.getConnections()) conn.send(msg);
       return;
     }
