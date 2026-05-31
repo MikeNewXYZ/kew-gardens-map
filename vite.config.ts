@@ -14,6 +14,10 @@ if (!process.env.VITEST) plugins.push(cloudflare());
 export default defineConfig({
   plugins,
   build: {
+    // Don't inject <link rel="modulepreload"> for the lazy route chunks — that
+    // was eagerly pulling the heavy pdf.js chunk on the map route. Each route's
+    // chunk now loads only when that tab is opened.
+    modulePreload: false,
     rollupOptions: {
       output: {
         // Keep the big, slow-changing libraries in their own cacheable chunks
