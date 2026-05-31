@@ -119,6 +119,12 @@ export function SearchView() {
     navigate({ to: "/map", search: { route: plant.name } });
   }
 
+  // Walking route to a fixed location point.
+  function routeToLocation(loc: LocationResult, e: React.MouseEvent) {
+    e.stopPropagation();
+    navigate({ to: "/map", search: { dest: `${loc.lng},${loc.lat}`, destName: loc.name } });
+  }
+
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -223,11 +229,21 @@ export function SearchView() {
                       </span>
                       <span className={styles.locBody}>
                         <span className={styles.locName}>{highlightMatch(item.loc.name, debounced)}</span>
-                        <span className={styles.locDetail}>{item.loc.detail || meta.label}</span>
+                        <span className={styles.locMeta}>
+                          <span className={styles.catChip} style={{ color: meta.color, borderColor: meta.color }}>
+                            {meta.label}
+                          </span>
+                          {item.loc.detail && <span className={styles.locDetail}>{item.loc.detail}</span>}
+                        </span>
                       </span>
-                      <span className={styles.catChip} style={{ color: meta.color, borderColor: meta.color }}>
-                        {meta.label}
-                      </span>
+                      <button
+                        className={styles.navBtn}
+                        onClick={(e) => routeToLocation(item.loc, e)}
+                        aria-label={`Navigate to ${item.loc.name}`}
+                        title="Navigate"
+                      >
+                        ➜ Navigate
+                      </button>
                     </div>
                   );
                 }
