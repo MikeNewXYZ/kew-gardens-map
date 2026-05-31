@@ -326,7 +326,13 @@ export function MapView() {
       if (!marker) {
         const el = document.createElement("div");
         el.className = styles.presence;
-        marker = new mapboxgl.Marker({ element: el }).setLngLat([u.lng, u.lat]).addTo(map);
+        const popup = new mapboxgl.Popup({ offset: 24, closeButton: false }).setHTML(
+          presencePopupHTML(u.emoji, id === myId),
+        );
+        marker = new mapboxgl.Marker({ element: el })
+          .setLngLat([u.lng, u.lat])
+          .setPopup(popup)
+          .addTo(map);
         markers.set(id, marker);
       }
       const el = marker.getElement();
@@ -563,6 +569,11 @@ export function MapView() {
 function popupHTML(name: string, accession?: string) {
   const acc = accession ? `<div class="plant-popup-acc">${accession}</div>` : "";
   return `<div class="plant-popup"><em>${name}</em>${acc}</div>`;
+}
+
+function presencePopupHTML(emoji: string, isSelf: boolean) {
+  const label = isSelf ? "Your last known location" : "Last known location";
+  return `<div class="presence-popup"><span class="presence-emoji">${emoji}</span><span>${label}</span></div>`;
 }
 
 /**
