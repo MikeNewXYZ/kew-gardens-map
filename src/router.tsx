@@ -6,11 +6,12 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { AppLayout } from "./views/AppLayout.tsx";
+// MapView is the landing route (/ redirects to /map), so load it eagerly — its
+// mapbox-gl chunk should start downloading with the entry, not after it boots.
+import { MapView } from "./views/MapView.tsx";
 
-// Code-split each tab: the map chunk carries mapbox-gl, search carries
-// minisearch, and the guide carries pdf.js/react-pdf — so visiting the map no
-// longer downloads the (heavy) PDF viewer or the search index.
-const MapView = lazyRouteComponent(() => import("./views/MapView.tsx"), "MapView");
+// Code-split the secondary tabs: search carries minisearch and the guide
+// carries pdf.js/react-pdf, so the map route never downloads either.
 const SearchView = lazyRouteComponent(() => import("./views/SearchView.tsx"), "SearchView");
 const PdfView = lazyRouteComponent(() => import("./views/PdfView.tsx"), "PdfView");
 
