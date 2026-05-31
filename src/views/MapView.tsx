@@ -521,7 +521,11 @@ export function MapView() {
   }, [users, myId, mapReady]);
 
   // Clear our own published ghost route when this view unmounts (leaving /map).
-  useEffect(() => () => publishRoute(null), [publishRoute]);
+  // Ref-based so it fires only on real unmount — never on a publishRoute identity
+  // change, which would otherwise wipe the route we resend on reconnect.
+  const publishRouteRef = useRef(publishRoute);
+  publishRouteRef.current = publishRoute;
+  useEffect(() => () => publishRouteRef.current(null), []);
 
   // Fly to a plant selected from the Search tab.
   useEffect(() => {

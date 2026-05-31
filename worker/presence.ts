@@ -52,7 +52,11 @@ interface NavMessage {
 interface NavEndMessage {
   type: "nav-end";
 }
-type ClientMessage = LocMessage | NavMessage | NavEndMessage;
+/** A one-off celebration the sender wants everyone to see (ephemeral). */
+interface CelebrateMessage {
+  type: "celebrate";
+}
+type ClientMessage = LocMessage | NavMessage | NavEndMessage | CelebrateMessage;
 
 /** Uniformly downsample a route to a fixed budget, always keeping both ends. */
 function downsampleRoute(coords: [number, number][]): [number, number][] {
@@ -158,6 +162,14 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
     const emoji =
       prev?.emoji ??
       assignEmoji(userId, new Set(Object.values(users).map((u) => u.emoji)));
+
+    if (data.type === "celebrate") {
+      // Ephemeral: fan the celebration out to everyone (sender included) without
+      // touching state, so each client can play the burst animation.
+      const msg = JSON.stringify({ type: "celebrate", emoji, userId });
+      for (const conn of this.getConnections()) conn.send(msg);
+      return;
+    }
 
     if (data.type === "loc") {
       const lng = Number(data.lng);
