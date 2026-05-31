@@ -24,6 +24,16 @@ interface Section {
   items: Item[];
 }
 
+/** Crisp arrow for "Navigate" buttons (renders identically on every device). */
+function NavArrow() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 12h15" />
+      <path d="m13 5 7 7-7 7" />
+    </svg>
+  );
+}
+
 export function SearchView() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -242,7 +252,8 @@ export function SearchView() {
                         aria-label={`Navigate to ${item.loc.name}`}
                         title="Navigate"
                       >
-                        ➜ Navigate
+                        <NavArrow />
+                        Navigate
                       </button>
                     </div>
                   );

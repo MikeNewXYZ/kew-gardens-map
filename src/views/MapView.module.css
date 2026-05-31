@@ -39,7 +39,7 @@
 /* Loading badge */
 .loading {
   position: absolute;
-  top: 14px;
+  top: calc(14px + var(--safe-top));
   left: 50%;
   transform: translateX(-50%);
   padding: 8px 18px;
@@ -59,8 +59,8 @@
 /* 3D/2D view toggle */
 .viewToggle {
   position: absolute;
-  top: 14px;
-  left: 14px;
+  top: calc(14px + var(--safe-top));
+  left: calc(14px + var(--safe-left));
   width: 44px;
   height: 44px;
   padding: 0;
@@ -88,13 +88,15 @@
 /* Navigation panel (active route) */
 .navPanel {
   position: absolute;
-  top: 14px;
+  top: calc(14px + var(--safe-top));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  max-width: min(420px, calc(100vw - 28px));
+  /* Keep ~60px clear each side so it never covers the 2D/3D button or the
+     top-right map controls on a narrow phone. */
+  max-width: min(360px, calc(100vw - 120px));
   padding: 12px 12px 12px 16px;
   background: rgba(255, 255, 255, 0.96);
   border-radius: 14px;
