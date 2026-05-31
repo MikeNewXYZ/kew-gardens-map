@@ -62,6 +62,10 @@ interface CelebrateMessage {
 interface MortonMessage {
   type: "morton";
 }
+/** The Fail button: rain thumbs-down + sad video for everyone (ephemeral). */
+interface FailMessage {
+  type: "fail";
+}
 /** Visitor picks a different avatar emoji for themselves. */
 interface SetEmojiMessage {
   type: "setEmoji";
@@ -73,6 +77,7 @@ type ClientMessage =
   | NavEndMessage
   | CelebrateMessage
   | MortonMessage
+  | FailMessage
   | SetEmojiMessage;
 
 /** Uniformly downsample a route to a fixed budget, always keeping both ends. */
@@ -211,6 +216,13 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
     if (data.type === "morton") {
       // Ephemeral musical-note burst for the whole room.
       const msg = JSON.stringify({ type: "morton", userId });
+      for (const conn of this.getConnections()) conn.send(msg);
+      return;
+    }
+
+    if (data.type === "fail") {
+      // Ephemeral group fail: thumbs-down storm + sad video for everyone.
+      const msg = JSON.stringify({ type: "fail", userId });
       for (const conn of this.getConnections()) conn.send(msg);
       return;
     }

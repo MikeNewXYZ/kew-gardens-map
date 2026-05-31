@@ -18,7 +18,7 @@ import {
   type LngLat,
 } from "../lib/nav.ts";
 import { createMap } from "../map.ts";
-import { playMorton } from "../lib/morton.ts";
+import { playFail, playMorton } from "../lib/morton.ts";
 import { usePresence } from "../lib/presence.tsx";
 import styles from "./MapView.module.css";
 
@@ -77,7 +77,7 @@ export function MapView() {
   const navMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const presenceMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const ghostMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
-  const { myId, users, publishRoute, mortonForEveryone } = usePresence();
+  const { myId, users, publishRoute, mortonForEveryone, failForEveryone } = usePresence();
 
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
@@ -733,6 +733,21 @@ export function MapView() {
           aria-label="The Morton button — plays a tune, buzzes, and rains notes for everyone"
         >
           🎵 The Morton Button
+        </button>
+      )}
+
+      {mapReady && (
+        <button
+          type="button"
+          className={styles.failBtn}
+          onClick={() => {
+            playFail(); // sad trombone + dejected buzz for the presser
+            failForEveryone(); // thumbs-down storm + sad video for the whole room
+          }}
+          title="Fail"
+          aria-label="Fail button — sad trombone, thumbs down, and a sad video for everyone"
+        >
+          👎 Fail
         </button>
       )}
 

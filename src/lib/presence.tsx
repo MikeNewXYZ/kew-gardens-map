@@ -10,6 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import celebrationStyles from "./celebration.module.css";
+import failStyles from "./fail.module.css";
+
+// A sad YouTube video for the Fail button. Swap this id for any video you like.
+const FAIL_VIDEO_ID = "dQw4w9WgXcQ";
+// How long the FAIL overlay stays up (ms).
+const FAIL_MS = 11000;
 
 // How long a celebration burst lingers on screen before it's cleaned up (ms).
 const CELEBRATION_MS = 3200;
@@ -60,6 +66,8 @@ interface PresenceContextValue {
   celebrate: () => void;
   /** Fire a musical-note burst (the Morton button) for everyone. */
   mortonForEveryone: () => void;
+  /** Trigger the group FAIL (thumbs-down storm + sad video) for everyone. */
+  failForEveryone: () => void;
   /** Choose a different avatar emoji (from EMOJI_CHOICES); persists + broadcasts. */
   setEmoji: (emoji: string) => void;
 }
@@ -94,6 +102,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const [liveCount, setLiveCount] = useState(0);
   const [bursts, setBursts] = useState<Burst[]>([]);
   const burstSeq = useRef(0);
+  const [fail, setFail] = useState<{ id: number } | null>(null);
+  const failSeq = useRef(0);
+  const failTimer = useRef<number | null>(null);
 
   // Keep the latest fix + route so we can (re)send them as soon as the socket opens.
   const lastLoc = useRef<string | null>(null);
@@ -106,6 +117,13 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     const id = (burstSeq.current += 1);
     setBursts((b) => [...b, { id, emoji, musical }]);
     setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), CELEBRATION_MS);
+  }, []);
+
+  // Show the FAIL overlay (sad video) and auto-dismiss it.
+  const triggerFailOverlay = useCallback(() => {
+    setFail({ id: (failSeq.current += 1) });
+    if (failTimer.current != null) clearTimeout(failTimer.current);
+    failTimer.current = window.setTimeout(() => setFail(null), FAIL_MS);
   }, []);
 
   const socket = useAgent<PresenceState>({
@@ -124,6 +142,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
           triggerBurst(data.emoji);
         } else if (data.type === "morton") {
           triggerBurst("🎵", true);
+        } else if (data.type === "fail") {
+          triggerBurst("👎");
+          triggerFailOverlay();
         }
       } catch {
         // internal agent frames / non-JSON — ignore
@@ -142,6 +163,13 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const mortonForEveryone = useCallback(() => {
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: "morton" }));
+    }
+  }, [socket]);
+
+  // Fail button: thumbs-down storm + sad video for everyone in the room.
+  const failForEveryone = useCallback(() => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "fail" }));
     }
   }, [socket]);
 
@@ -205,11 +233,51 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   return (
     <PresenceContext.Provider
-      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, liveCount, publishRoute, celebrate, mortonForEveryone, setEmoji }}
+      value={{
+        myId: userId,
+        myEmoji: users[userId]?.emoji,
+        users,
+        liveCount,
+        publishRoute,
+        celebrate,
+        mortonForEveryone,
+        failForEveryone,
+        setEmoji,
+      }}
     >
       {children}
       <CelebrationOverlay bursts={bursts} />
+      {fail && <FailOverlay key={fail.id} onClose={() => setFail(null)} />}
     </PresenceContext.Provider>
+  );
+}
+
+/** Over-the-top FAIL takeover: red flashing, screen shake, and a sad video. */
+function FailOverlay({ onClose }: { onClose: () => void }) {
+  const src =
+    `https://www.youtube.com/embed/${FAIL_VIDEO_ID}` +
+    `?autoplay=1&mute=1&controls=0&playsinline=1&modestbranding=1&rel=0&loop=1&playlist=${FAIL_VIDEO_ID}`;
+  return (
+    <div className={failStyles.overlay} role="alertdialog" aria-label="Epic fail">
+      <div className={failStyles.shake}>
+        <div className={failStyles.title}>
+          EPIC <span className={failStyles.titleHuge}>FAIL</span> 👎
+        </div>
+        <div className={failStyles.videoWrap}>
+          <iframe
+            className={failStyles.video}
+            src={src}
+            title="A sad video"
+            allow="autoplay; encrypted-media"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        </div>
+        <button type="button" className={failStyles.dismiss} onClick={onClose}>
+          Ugh, dismiss
+        </button>
+      </div>
+    </div>
   );
 }
 
