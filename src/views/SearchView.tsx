@@ -5,7 +5,6 @@ import {
   CATEGORY_META,
   CATEGORY_ORDER,
   searchLocations,
-  type LocationCategory,
   type LocationResult,
 } from "../lib/locations.ts";
 import { searchPlants, suggestTerms, type SpeciesResult } from "../lib/search.ts";

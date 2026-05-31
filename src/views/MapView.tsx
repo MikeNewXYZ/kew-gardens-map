@@ -16,6 +16,7 @@ import {
   type LngLat,
 } from "../lib/nav.ts";
 import { createMap } from "../map.ts";
+import { usePresence } from "../lib/presence.tsx";
 import styles from "./MapView.module.css";
 
 const SOURCE = "plants";
@@ -45,9 +46,12 @@ export function MapView() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const hoverPopupRef = useRef<mapboxgl.Popup | null>(null);
   const navMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const presenceMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const { myId, users } = usePresence();
 
   const [genusStyle, setGenusStyle] = useState<GenusStyle | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
   const [nav, setNav] = useState<NavInfo | null>(null);
   const [navError, setNavError] = useState<string | null>(null);
@@ -85,6 +89,8 @@ export function MapView() {
     });
 
     map.on("load", () => {
+      setMapReady(true);
+
       // Grey out everything outside the gardens: a world-covering polygon with
       // the Kew boundary cut out as a hole.
       if (!map.getSource(MASK)) {
@@ -280,10 +286,46 @@ export function MapView() {
 
     return () => {
       hoverPopup.remove();
+      presenceMarkersRef.current.forEach((m) => m.remove());
+      presenceMarkersRef.current.clear();
       map.remove();
       mapRef.current = null;
+      setMapReady(false);
     };
   }, []);
+
+  // Live visitor markers: one emoji bubble per user, reconciled as the shared
+  // presence state changes. Users outside the gardens / stale (>30 min) drop out
+  // automatically because the Durable Object removes them from the broadcast.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    const markers = presenceMarkersRef.current;
+    const seen = new Set<string>();
+
+    for (const [id, u] of Object.entries(users)) {
+      if (u.lng == null || u.lat == null) continue;
+      seen.add(id);
+      let marker = markers.get(id);
+      if (!marker) {
+        const el = document.createElement("div");
+        el.className = styles.presence;
+        marker = new mapboxgl.Marker({ element: el }).setLngLat([u.lng, u.lat]).addTo(map);
+        markers.set(id, marker);
+      }
+      const el = marker.getElement();
+      el.textContent = u.emoji;
+      el.classList.toggle(styles.presenceSelf, id === myId);
+      marker.setLngLat([u.lng, u.lat]);
+    }
+
+    for (const [id, marker] of markers) {
+      if (!seen.has(id)) {
+        marker.remove();
+        markers.delete(id);
+      }
+    }
+  }, [users, myId, mapReady]);
 
   // Fly to a plant selected from the Search tab.
   useEffect(() => {

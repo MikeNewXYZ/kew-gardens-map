@@ -1,5 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { usePresence } from "../lib/presence.tsx";
 import styles from "./AppLayout.module.css";
 
 const ICON = {
@@ -48,6 +49,7 @@ function TabIcon({ children }: { children: ReactNode }) {
 }
 
 export function AppLayout() {
+  const { myEmoji } = usePresence();
   return (
     <div className={styles.app}>
       <header className={styles.topbar}>
@@ -58,6 +60,13 @@ export function AppLayout() {
           <h1>Kew</h1>
           <p>Garden Map</p>
         </div>
+        <span
+          className={styles.you}
+          title="You on the map"
+          aria-label={myEmoji ? `You are ${myEmoji}` : "Connecting…"}
+        >
+          {myEmoji ?? "…"}
+        </span>
       </header>
 
       <main className={styles.main}>

@@ -55,6 +55,20 @@
   color: var(--brass-bright);
 }
 
+/* Your assigned presence emoji — sits at the right edge of the header. */
+.you {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  font-size: 1.15rem;
+  line-height: 1;
+  border-radius: 50%;
+  background: rgba(244, 239, 225, 0.14);
+  box-shadow: 0 0 0 1.5px var(--brass-bright) inset;
+}
+
 .main {
   flex: 1 1 auto;
   min-height: 0;

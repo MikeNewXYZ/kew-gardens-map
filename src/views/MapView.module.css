@@ -8,6 +8,27 @@
   inset: 0;
 }
 
+/* ---------- Live visitor presence markers ---------- */
+.presence {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: default;
+  transition: transform 0.4s ease;
+  will-change: transform;
+}
+
+/* Your own marker gets a brass ring so you can pick yourself out. */
+.presenceSelf {
+  box-shadow: 0 0 0 2.5px var(--brass, #b9892f), 0 1px 5px rgba(0, 0, 0, 0.4);
+}
+
 /* Loading badge */
 .loading {
   position: absolute;
