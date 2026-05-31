@@ -3,9 +3,10 @@ import { KEW_BOUNDARY_RING } from "./kew-boundary.ts";
 
 /** How long a visitor's whole presence survives once they stop being live. */
 const TTL_MS = 30 * 60 * 1000; // 30 minutes
-/** How long a last-known location is kept after the visitor leaves the gardens. */
-const OUTSIDE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const PRUNE_INTERVAL_S = 60;
+/** Cap on broadcast route size — the whole state is re-sent to every client. */
+const MAX_ROUTE_POINTS = 64;
+
 /** London-local date string (YYYY-MM-DD) — used to wipe locations each day. */
 function londonDay(now: number): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -16,14 +17,19 @@ function londonDay(now: number): string {
   }).format(new Date(now));
 }
 
-/** One live visitor: an assigned emoji and (optionally) a last-known position. */
+/** A walking route a visitor is following, broadcast to others as a "ghost". */
+export interface GhostRoute {
+  coordinates: [number, number][];
+  destName?: string;
+}
+
+/** One live visitor: an assigned emoji, an optional in-bounds position + route. */
 export interface Presence {
   emoji: string;
   lng?: number;
   lat?: number;
   lastSeen: number; // epoch ms
-  /** When the visitor first went outside the boundary (cleared once back in). */
-  outsideSince?: number;
+  route?: GhostRoute;
 }
 
 export interface PresenceState {
@@ -32,11 +38,30 @@ export interface PresenceState {
   lastResetDay?: string;
 }
 
-/** A location update pushed from a client over the WebSocket. */
+/** Messages a client can push over the WebSocket. */
 interface LocMessage {
   type: "loc";
   lng: number;
   lat: number;
+}
+interface NavMessage {
+  type: "nav";
+  coordinates: [number, number][];
+  destName?: string;
+}
+interface NavEndMessage {
+  type: "nav-end";
+}
+type ClientMessage = LocMessage | NavMessage | NavEndMessage;
+
+/** Uniformly downsample a route to a fixed budget, always keeping both ends. */
+function downsampleRoute(coords: [number, number][]): [number, number][] {
+  if (coords.length <= MAX_ROUTE_POINTS) return coords;
+  const out: [number, number][] = [];
+  const stride = (coords.length - 1) / (MAX_ROUTE_POINTS - 1);
+  for (let i = 0; i < MAX_ROUTE_POINTS; i++) out.push(coords[Math.round(i * stride)]);
+  out[out.length - 1] = coords[coords.length - 1]; // exact destination
+  return out;
 }
 
 // Distinct, friendly emoji assigned one-per-visitor.
@@ -76,15 +101,14 @@ function pointInRing(lng: number, lat: number, ring: [number, number][]): boolea
 /**
  * Shared real-time presence "room", built on the Agents SDK as a stateful
  * Durable Object. Every visitor connects (over a WebSocket) to the single
- * `global` instance and is given an emoji + their last-known position. The
- * Agent's state is automatically broadcast to all connected clients, so each
- * visitor sees everyone else move in real time.
+ * `global` instance and is given an emoji. The Agent's state is automatically
+ * broadcast to all connected clients, so each visitor sees everyone else move
+ * (and, while navigating, each other's route as a "ghost") in real time.
  *
  * Location lifetime:
  *  - Inside the gardens: the last-known position is kept while the visitor is live.
- *  - Outside the gardens: the last-known position is still recorded, but removed
- *    15 minutes after they left.
- *  - End of day (London time): all stored locations are wiped.
+ *  - Outside the gardens: the position is NOT stored (the marker simply drops).
+ *  - End of day (London time): all stored locations and routes are wiped.
  *  - The whole presence entry is pruned after 30 minutes of not being live.
  */
 export class PresenceAgent extends Agent<Env, PresenceState> {
@@ -121,17 +145,12 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
     const userId = (connection.state as { userId?: string } | null)?.userId;
     if (!userId || typeof message !== "string") return;
 
-    let data: LocMessage;
+    let data: ClientMessage;
     try {
-      data = JSON.parse(message) as LocMessage;
+      data = JSON.parse(message) as ClientMessage;
     } catch {
       return;
     }
-    if (data.type !== "loc") return;
-
-    const lng = Number(data.lng);
-    const lat = Number(data.lat);
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
 
     const now = Date.now();
     const users = { ...this.state.users };
@@ -140,34 +159,60 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
       prev?.emoji ??
       assignEmoji(userId, new Set(Object.values(users).map((u) => u.emoji)));
 
-    // Record the last-known position whether inside or outside the gardens.
-    // Inside clears the "outside" stamp. Outside keeps the original stamp (so the
-    // 15-minute window runs from when they first left, not from each update) and
-    // stops recording the position once that window has passed.
-    if (pointInRing(lng, lat, KEW_BOUNDARY_RING)) {
-      users[userId] = { emoji, lng, lat, lastSeen: now, outsideSince: undefined };
-    } else {
-      const outsideSince = prev?.outsideSince ?? now;
-      const expired = now - outsideSince > OUTSIDE_TTL_MS;
-      users[userId] = expired
-        ? { emoji, lastSeen: now, outsideSince }
-        : { emoji, lng, lat, lastSeen: now, outsideSince };
+    if (data.type === "loc") {
+      const lng = Number(data.lng);
+      const lat = Number(data.lat);
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+      // Only positions inside the gardens are stored; outside, the marker drops.
+      // The active route is preserved across location ticks (which fire often).
+      users[userId] = pointInRing(lng, lat, KEW_BOUNDARY_RING)
+        ? { emoji, lng, lat, lastSeen: now, route: prev?.route }
+        : { emoji, lastSeen: now, route: prev?.route };
+      this.setState({ users });
+      return;
     }
-    this.setState({ users });
+
+    if (data.type === "nav") {
+      const coords = Array.isArray(data.coordinates)
+        ? data.coordinates.filter(
+            (c): c is [number, number] =>
+              Array.isArray(c) &&
+              c.length === 2 &&
+              Number.isFinite(c[0]) &&
+              Number.isFinite(c[1]),
+          )
+        : [];
+      if (coords.length < 2) return;
+      const destName =
+        typeof data.destName === "string" ? data.destName.slice(0, 120) : undefined;
+      users[userId] = {
+        ...(prev ?? { emoji }),
+        emoji,
+        lastSeen: now,
+        route: { coordinates: downsampleRoute(coords), destName },
+      };
+      this.setState({ users });
+      return;
+    }
+
+    if (data.type === "nav-end") {
+      if (!prev) return;
+      users[userId] = { ...prev, lastSeen: now, route: undefined };
+      this.setState({ users });
+    }
   }
 
   // Note: we deliberately keep a user's entry on disconnect so their last-known
   // location lingers on the map until the 30-minute TTL prunes it below.
 
   /**
-   * Recurring alarm. Enforces, in order: the end-of-day location wipe, the
-   * 15-minute expiry of out-of-bounds locations, and the 30-minute removal of
-   * visitors who are no longer live.
+   * Recurring alarm. Enforces the end-of-day location/route wipe and the
+   * 30-minute removal of visitors who are no longer live.
    */
   prune() {
     const now = Date.now();
     const today = londonDay(now);
-    // On a new London day, drop every stored location (identities are kept).
+    // On a new London day, drop every stored location and route (identities kept).
     const wipeLocations =
       this.state.lastResetDay !== undefined && this.state.lastResetDay !== today;
 
@@ -186,19 +231,11 @@ export class PresenceAgent extends Agent<Env, PresenceState> {
         changed = true;
         continue;
       }
-      const hasLocation = u.lng !== undefined || u.lat !== undefined;
-      const expiredOutside =
-        u.outsideSince !== undefined && now - u.outsideSince > OUTSIDE_TTL_MS;
       if (wipeLocations) {
-        // End of day: clear the location AND the outside stamp (fresh start).
-        if (hasLocation || u.outsideSince !== undefined) changed = true;
+        if (u.lng !== undefined || u.lat !== undefined || u.route !== undefined) {
+          changed = true;
+        }
         next[id] = { emoji: u.emoji, lastSeen: u.lastSeen };
-      } else if (expiredOutside) {
-        // Outside > 15 min: clear the location but KEEP the stamp sticky, so a
-        // continued stream of outside updates can't resurrect it (only coming
-        // back inside resets it). The identity (emoji) is kept.
-        if (hasLocation) changed = true;
-        next[id] = { emoji: u.emoji, lastSeen: u.lastSeen, outsideSince: u.outsideSince };
       } else {
         next[id] = u;
       }

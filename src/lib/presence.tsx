@@ -1,6 +1,7 @@
 import { useAgent } from "agents/react";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -10,12 +11,16 @@ import {
 
 // Mirrors the server-side shape in worker/presence.ts (kept in sync by hand to
 // avoid pulling the Worker's build graph into the client bundle).
+export interface GhostRoute {
+  coordinates: [number, number][];
+  destName?: string;
+}
 export interface Presence {
   emoji: string;
   lng?: number;
   lat?: number;
   lastSeen: number;
-  outsideSince?: number;
+  route?: GhostRoute;
 }
 interface PresenceState {
   users: Record<string, Presence>;
@@ -29,6 +34,8 @@ interface PresenceContextValue {
   myEmoji?: string;
   /** Everyone currently known to the presence room, keyed by id. */
   users: Record<string, Presence>;
+  /** Broadcast (or clear, with null) this visitor's active route as a ghost. */
+  publishRoute: (route: GhostRoute | null) => void;
 }
 
 const PresenceContext = createContext<PresenceContextValue | null>(null);
@@ -53,8 +60,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const [userId] = useState(loadUserId);
   const [users, setUsers] = useState<Record<string, Presence>>({});
 
-  // Keep the latest fix so we can (re)send it as soon as the socket opens.
+  // Keep the latest fix + route so we can (re)send them as soon as the socket opens.
   const lastLoc = useRef<string | null>(null);
+  const lastRoute = useRef<string | null>(null);
 
   const socket = useAgent<PresenceState>({
     agent: "PresenceAgent",
@@ -63,10 +71,24 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     onStateUpdate: (state) => setUsers(state?.users ?? {}),
   });
 
-  // Flush the most recent location once (re)connected.
+  // Broadcast (or clear) this visitor's active navigation route.
+  const publishRoute = useCallback(
+    (route: GhostRoute | null) => {
+      const msg = route
+        ? JSON.stringify({ type: "nav", coordinates: route.coordinates, destName: route.destName })
+        : JSON.stringify({ type: "nav-end" });
+      // A finished route must NOT be resurrected on reconnect.
+      lastRoute.current = route ? msg : null;
+      if (socket.readyState === WebSocket.OPEN) socket.send(msg);
+    },
+    [socket],
+  );
+
+  // Flush the most recent location + active route once (re)connected.
   useEffect(() => {
     const flush = () => {
       if (lastLoc.current) socket.send(lastLoc.current);
+      if (lastRoute.current) socket.send(lastRoute.current);
     };
     socket.addEventListener("open", flush);
     return () => socket.removeEventListener("open", flush);
@@ -93,7 +115,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   return (
     <PresenceContext.Provider
-      value={{ myId: userId, myEmoji: users[userId]?.emoji, users }}
+      value={{ myId: userId, myEmoji: users[userId]?.emoji, users, publishRoute }}
     >
       {children}
     </PresenceContext.Provider>

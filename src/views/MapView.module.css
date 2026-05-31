@@ -27,6 +27,15 @@
   box-shadow: 0 0 0 2.5px var(--brass, #b9892f), 0 1px 5px rgba(0, 0, 0, 0.4);
 }
 
+/* Faint copy of a navigating visitor's emoji at their ghost-route destination. */
+.ghostMarker {
+  opacity: 0.45;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  filter: saturate(0.7);
+}
+
 /* Loading badge */
 .loading {
   position: absolute;
@@ -130,6 +139,23 @@
   line-height: 1.35;
 }
 
+.navRetry {
+  margin-top: 8px;
+  border: 1px solid #1b4332;
+  border-radius: 999px;
+  background: #1b4332;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.navRetry:hover {
+  background: #14301f;
+}
+
 .navClose {
   flex: 0 0 auto;
   width: 28px;
@@ -149,18 +175,21 @@
   color: #1b4332;
 }
 
-/* Genus legend (collapsible) */
+/* Layer legend (collapsible, toggleable) */
 .legendToggle {
   position: absolute;
   bottom: calc(36px + var(--safe-bottom));
   right: calc(12px + var(--safe-right));
-  padding: 9px 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
   border: 1px solid var(--rule);
   border-radius: 999px;
   background: rgba(251, 247, 236, 0.92);
   color: var(--forest);
   font-family: var(--font-ui);
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -175,89 +204,183 @@
 }
 
 .legendToggle:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
-.legendHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.legendClose {
-  border: none;
-  background: transparent;
-  font-size: 1.2rem;
-  line-height: 1;
-  color: var(--text-soft);
-  cursor: pointer;
-  padding: 0 2px;
-}
-
-.legendClose:hover {
-  color: var(--forest);
+.legendToggleDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: conic-gradient(#2d6a4f, #9c4a32, #7d5ba6, #b8862f, #2d6a4f);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
 .legend {
   position: absolute;
   bottom: calc(36px + var(--safe-bottom));
   right: calc(12px + var(--safe-right));
-  width: 190px;
-  padding: 13px 15px;
-  background: rgba(251, 247, 236, 0.95);
+  width: 240px;
+  max-height: min(70vh, 460px);
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: rgba(251, 247, 236, 0.97);
   border: 1px solid var(--rule);
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: var(--shadow-2);
-  backdrop-filter: blur(8px);
-  z-index: 5;
-  font-size: 0.78rem;
+  backdrop-filter: blur(10px);
+  z-index: 6;
+  overflow: hidden;
+}
+
+.legendHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 6px 12px;
 }
 
 .legendTitle {
+  font-family: var(--font-ui);
   font-weight: 700;
   color: var(--brass);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.1em;
+}
+
+.legendClose {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.legendClose:hover {
+  background: var(--rule-soft);
+  color: var(--forest);
+}
+
+.legendList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .legendRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 1px 0;
+  gap: 11px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.13s ease;
+}
+
+.legendRow:hover {
+  background: var(--rule-soft);
+}
+
+.legendRow:active {
+  background: var(--rule);
 }
 
 .swatch {
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+  transition: opacity 0.15s ease;
 }
 
 .legendName {
   flex: 1 1 auto;
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.15s ease;
 }
 
-.legendCount {
-  flex: 0 0 auto;
+.legendNameOff {
   color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
 }
 
-/* Mobile: shrink legend, keep controls reachable */
+/* Pill switch */
+.legendSwitch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--rule);
+  transition: background 0.18s ease;
+}
+
+.legendSwitchOn {
+  background: var(--leaf, #40916c);
+}
+
+.legendKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s ease;
+}
+
+.legendSwitchOn .legendKnob {
+  transform: translateX(16px);
+}
+
+/* Mobile: dock the legend as a bottom sheet with full-width tap targets */
 @media (max-width: 540px) {
   .legend {
-    width: 158px;
-    bottom: calc(22px + var(--safe-bottom));
+    left: calc(10px + var(--safe-left));
+    right: calc(10px + var(--safe-right));
+    width: auto;
+    bottom: calc(20px + var(--safe-bottom));
+    max-height: 56vh;
+    border-radius: 18px;
+  }
+
+  .legendRow {
+    min-height: 48px;
+  }
+
+  .legendName {
+    font-size: 1.02rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legendKnob,
+  .legendSwitch,
+  .swatch,
+  .legendName {
+    transition: none;
   }
 }

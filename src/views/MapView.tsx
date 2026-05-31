@@ -1,12 +1,13 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import mapboxgl from "mapbox-gl";
 import { useEffect, useRef, useState } from "react";
+import { buildGenusStyle, loadPlants, type PlantProps } from "../lib/plants.ts";
 import {
-  buildGenusStyle,
-  loadPlants,
-  type GenusStyle,
-  type PlantProps,
-} from "../lib/plants.ts";
+  CATEGORY_META,
+  CATEGORY_ORDER,
+  loadLocations,
+  type LocationProps,
+} from "../lib/locations.ts";
 import {
   fetchWalkingRoute,
   formatDistance,
@@ -21,14 +22,34 @@ import { usePresence } from "../lib/presence.tsx";
 import styles from "./MapView.module.css";
 
 const SOURCE = "plants";
+const LOCATIONS = "locations";
 const BOUNDARY = "kew-boundary";
 const MASK = "kew-mask";
 const ROUTE = "nav-route";
+const GHOST = "ghost-routes";
 
 const idle = (cb: () => void) =>
   window.requestIdleCallback
     ? window.requestIdleCallback(() => cb(), { timeout: 2000 })
     : window.setTimeout(cb, 1);
+
+// All map layers that make up the "Plants" group (heat + clusters + points).
+const PLANT_LAYERS = ["plant-heat", "clusters", "cluster-count", "plant-point"];
+
+// One legend row per toggleable group: plants, then each location category.
+const LEGEND_ITEMS: { key: string; label: string; color: string }[] = [
+  { key: "plants", label: "Plants", color: "#2d6a4f" },
+  ...CATEGORY_ORDER.map((cat) => ({
+    key: cat,
+    label: CATEGORY_META[cat].plural,
+    color: CATEGORY_META[cat].color,
+  })),
+];
+
+/** Map layer ids controlled by a given legend row. */
+function legendLayers(key: string): string[] {
+  return key === "plants" ? PLANT_LAYERS : [`loc-${key}`, `loc-${key}-label`];
+}
 
 interface NavInfo {
   label: string; // "Nearest specimen" for plants, "Walking route" for places
@@ -54,15 +75,18 @@ export function MapView() {
   navigateRef.current = navigate;
   const navMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const presenceMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
-  const { myId, users } = usePresence();
+  const ghostMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const { myId, users, publishRoute } = usePresence();
 
-  const [genusStyle, setGenusStyle] = useState<GenusStyle | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
-  const [legendOpen, setLegendOpen] = useState(false);
   const [nav, setNav] = useState<NavInfo | null>(null);
   const [navError, setNavError] = useState<string | null>(null);
+  const [canRetry, setCanRetry] = useState(false); // show a retry button on the error
+  const [retry, setRetry] = useState(0); // bump to re-run the navigation effect
   const [threeD, setThreeD] = useState(true); // map starts pitched (pitch 55)
+  const [legendOpen, setLegendOpen] = useState(false);
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
   // Create the map + plant layers once.
   useEffect(() => {
@@ -136,6 +160,26 @@ export function MapView() {
         });
       }
 
+      // Other visitors' live navigation, drawn as faint "ghost" lines (slot
+      // "middle" so they sit below the user's own blue route on "top").
+      if (!map.getSource(GHOST)) {
+        const empty: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+        map.addSource(GHOST, { type: "geojson", data: empty });
+        map.addLayer({
+          id: "ghost-route-line",
+          type: "line",
+          source: GHOST,
+          slot: "middle",
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: {
+            "line-color": "#6b8f7a",
+            "line-width": 4,
+            "line-opacity": 0.35,
+            "line-emissive-strength": 0.6,
+          },
+        });
+      }
+
       // Walking-route line (start empty; populated when navigating). A casing
       // under the main line keeps it legible over busy ground textures.
       if (!map.getSource(ROUTE)) {
@@ -166,7 +210,6 @@ export function MapView() {
       void dataPromise.then((data) => {
         if (map.getSource(SOURCE)) return;
         const gstyle = buildGenusStyle(data);
-        setGenusStyle(gstyle);
 
         map.addSource(SOURCE, {
           type: "geojson",
@@ -246,6 +289,22 @@ export function MapView() {
           },
         } as mapboxgl.LayerSpecification);
 
+        // Invisible, larger tap target so the tiny plant dots are easy to hit.
+        // Mapbox hit-testing is geometry-based, so an opacity-0 circle still
+        // receives clicks/hover; the visible "plant-point" dot is unchanged.
+        map.addLayer({
+          id: "plant-hit",
+          type: "circle",
+          source: SOURCE,
+          filter: ["!", ["has", "point_count"]],
+          slot: "top",
+          paint: {
+            "circle-color": "transparent",
+            "circle-opacity": 0,
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 12, 17, 16, 19.5, 22],
+          },
+        } as mapboxgl.LayerSpecification);
+
         // Expand a cluster on click (true expansion zoom, not a fixed step).
         map.on("click", "clusters", (e) => {
           const f = map.queryRenderedFeatures(e.point, { layers: ["clusters"] })[0];
@@ -259,7 +318,8 @@ export function MapView() {
         });
 
         // Reusable hover tooltip for individual plants (perf: one popup instance).
-        map.on("mousemove", "plant-point", (e) => {
+        // Bound to the larger "plant-hit" target, not the visible dot.
+        map.on("mousemove", "plant-hit", (e) => {
           const f = e.features?.[0];
           if (!f || f.geometry.type !== "Point") return;
           map.getCanvas().style.cursor = "pointer";
@@ -269,13 +329,13 @@ export function MapView() {
             .setHTML(popupHTML(p.name, p.accession))
             .addTo(map);
         });
-        map.on("mouseleave", "plant-point", () => {
+        map.on("mouseleave", "plant-hit", () => {
           map.getCanvas().style.cursor = "";
           hoverPopup.remove();
         });
 
         // Click a plant for a pinned popup with a Navigate button (touch too).
-        map.on("click", "plant-point", (e) => {
+        map.on("click", "plant-hit", (e) => {
           const f = e.features?.[0];
           if (!f || f.geometry.type !== "Point") return;
           const p = f.properties as PlantProps;
@@ -296,6 +356,73 @@ export function MapView() {
         map.on("mouseenter", "clusters", () => (map.getCanvas().style.cursor = "pointer"));
         map.on("mouseleave", "clusters", () => (map.getCanvas().style.cursor = ""));
 
+        // Location points of interest — one toggleable circle+label layer per
+        // category so the legend control can show/hide each independently.
+        void loadLocations().then((locs) => {
+          if (!map.getSource(LOCATIONS)) {
+            map.addSource(LOCATIONS, { type: "geojson", data: locs });
+            for (const cat of CATEGORY_ORDER) {
+              const color = CATEGORY_META[cat].color;
+              map.addLayer({
+                id: `loc-${cat}`,
+                type: "circle",
+                source: LOCATIONS,
+                slot: "top",
+                filter: ["==", ["get", "category"], cat],
+                paint: {
+                  "circle-color": color,
+                  "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 18, 8],
+                  "circle-stroke-width": 2,
+                  "circle-stroke-color": "#ffffff",
+                  "circle-emissive-strength": 1,
+                },
+              } as mapboxgl.LayerSpecification);
+              map.addLayer({
+                id: `loc-${cat}-label`,
+                type: "symbol",
+                source: LOCATIONS,
+                slot: "top",
+                minzoom: 15,
+                filter: ["==", ["get", "category"], cat],
+                layout: {
+                  "text-field": ["get", "name"],
+                  "text-size": 11,
+                  "text-offset": [0, 1.1],
+                  "text-anchor": "top",
+                  "text-font": ["DIN Pro Medium", "Arial Unicode MS Regular"],
+                  "text-optional": true,
+                },
+                paint: {
+                  "text-color": color,
+                  "text-halo-color": "#ffffff",
+                  "text-halo-width": 1.4,
+                },
+              } as mapboxgl.LayerSpecification);
+
+              // Click a location for a popup with a Navigate-here button.
+              map.on("click", `loc-${cat}`, (e) => {
+                const f = e.features?.[0];
+                if (!f || f.geometry.type !== "Point") return;
+                const p = f.properties as LocationProps;
+                const coords = f.geometry.coordinates as [number, number];
+                new mapboxgl.Popup({ offset: 12 })
+                  .setLngLat(coords)
+                  .setDOMContent(
+                    popupContent(p.name, p.detail || undefined, () =>
+                      navigateRef.current({
+                        to: "/map",
+                        search: { dest: `${coords[0]},${coords[1]}`, destName: p.name },
+                      }),
+                    ),
+                  )
+                  .addTo(map);
+              });
+              map.on("mouseenter", `loc-${cat}`, () => (map.getCanvas().style.cursor = "pointer"));
+              map.on("mouseleave", `loc-${cat}`, () => (map.getCanvas().style.cursor = ""));
+            }
+          }
+        });
+
         map.once("idle", () => setLoading(false));
       });
     });
@@ -304,6 +431,8 @@ export function MapView() {
       hoverPopup.remove();
       presenceMarkersRef.current.forEach((m) => m.remove());
       presenceMarkersRef.current.clear();
+      ghostMarkersRef.current.forEach((m) => m.remove());
+      ghostMarkersRef.current.clear();
       map.remove();
       mapRef.current = null;
       setMapReady(false);
@@ -326,13 +455,7 @@ export function MapView() {
       if (!marker) {
         const el = document.createElement("div");
         el.className = styles.presence;
-        const popup = new mapboxgl.Popup({ offset: 24, closeButton: false }).setHTML(
-          presencePopupHTML(u.emoji, id === myId),
-        );
-        marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([u.lng, u.lat])
-          .setPopup(popup)
-          .addTo(map);
+        marker = new mapboxgl.Marker({ element: el }).setLngLat([u.lng, u.lat]).addTo(map);
         markers.set(id, marker);
       }
       const el = marker.getElement();
@@ -348,6 +471,57 @@ export function MapView() {
       }
     }
   }, [users, myId, mapReady]);
+
+  // Ghost navigation: other visitors' active routes, drawn as a faint line with
+  // a faint copy of their emoji at the destination. Our own route is excluded
+  // (we already see it as the solid blue route).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const features: GeoJSON.Feature[] = [];
+    for (const [id, u] of Object.entries(users)) {
+      if (id === myId) continue;
+      const coords = u.route?.coordinates;
+      if (!coords || coords.length < 2) continue;
+      features.push({
+        type: "Feature",
+        properties: { id },
+        geometry: { type: "LineString", coordinates: coords },
+      });
+    }
+    const src = map.getSource(GHOST) as mapboxgl.GeoJSONSource | undefined;
+    src?.setData({ type: "FeatureCollection", features });
+
+    // Faint emoji marker at each ghost route's destination.
+    const markers = ghostMarkersRef.current;
+    const seen = new Set<string>();
+    for (const [id, u] of Object.entries(users)) {
+      if (id === myId) continue;
+      const coords = u.route?.coordinates;
+      if (!coords || coords.length < 2) continue;
+      const dest = coords[coords.length - 1];
+      seen.add(id);
+      let marker = markers.get(id);
+      if (!marker) {
+        const el = document.createElement("div");
+        el.className = `${styles.presence} ${styles.ghostMarker}`;
+        marker = new mapboxgl.Marker({ element: el }).setLngLat(dest).addTo(map);
+        markers.set(id, marker);
+      }
+      marker.getElement().textContent = u.emoji;
+      marker.setLngLat(dest);
+    }
+    for (const [id, marker] of markers) {
+      if (!seen.has(id)) {
+        marker.remove();
+        markers.delete(id);
+      }
+    }
+  }, [users, myId, mapReady]);
+
+  // Clear our own published ghost route when this view unmounts (leaving /map).
+  useEffect(() => () => publishRoute(null), [publishRoute]);
 
   // Fly to a plant selected from the Search tab.
   useEffect(() => {
@@ -381,6 +555,7 @@ export function MapView() {
     const destStr = search.dest;
     if (!routeName && !destStr) {
       clearRoute(map, navMarkersRef);
+      publishRoute(null);
       setNav(null);
       setNavError(null);
       return;
@@ -388,6 +563,7 @@ export function MapView() {
 
     let cancelled = false;
     setNavError(null);
+    setCanRetry(false);
 
     async function run() {
       // Always start from the visitor's real GPS position.
@@ -396,6 +572,7 @@ export function MapView() {
       if (!from) {
         setNav(null);
         setNavError("Couldn't get your location. Turn on location access to navigate.");
+        setCanRetry(true);
         return;
       }
 
@@ -435,6 +612,10 @@ export function MapView() {
       if (cancelled || !map) return;
 
       drawRoute(map, navMarkersRef, from, destCoords, destName, route?.geometry);
+      publishRoute({
+        coordinates: (route?.geometry.coordinates ?? [from, destCoords]) as [number, number][],
+        destName,
+      });
       setNav({
         label,
         name: destName,
@@ -449,7 +630,7 @@ export function MapView() {
     return () => {
       cancelled = true;
     };
-  }, [search.route, search.dest, search.destName]);
+  }, [search.route, search.dest, search.destName, retry, publishRoute]);
 
   // Toggle between the pitched 3D view and a flat top-down 2D view.
   function toggle3D() {
@@ -472,9 +653,28 @@ export function MapView() {
     };
   }, [mapReady]);
 
+  // Show/hide a legend group's layers on the map.
+  function toggleLayer(key: string) {
+    const map = mapRef.current;
+    if (!map) return;
+    setHidden((prev) => {
+      const next = new Set(prev);
+      const hide = !next.has(key);
+      if (hide) next.add(key);
+      else next.delete(key);
+      for (const id of legendLayers(key)) {
+        if (map.getLayer(id)) {
+          map.setLayoutProperty(id, "visibility", hide ? "none" : "visible");
+        }
+      }
+      return next;
+    });
+  }
+
   function endNavigation() {
     const map = mapRef.current;
     if (map) clearRoute(map, navMarkersRef);
+    publishRoute(null);
     setNav(null);
     setNavError(null);
     navigate({ to: "/map", search: {} });
@@ -512,6 +712,15 @@ export function MapView() {
           ) : (
             <div className={styles.navBody}>
               <div className={styles.navName}>{navError}</div>
+              {canRetry && (
+                <button
+                  type="button"
+                  className={styles.navRetry}
+                  onClick={() => setRetry((n) => n + 1)}
+                >
+                  Try again
+                </button>
+              )}
             </div>
           )}
           <button
@@ -525,40 +734,61 @@ export function MapView() {
         </div>
       )}
 
-      {genusStyle && !legendOpen && (
+      {mapReady && !legendOpen && (
         <button
           type="button"
           className={styles.legendToggle}
           onClick={() => setLegendOpen(true)}
           aria-expanded={false}
         >
-          🌿 Key
+          <span className={styles.legendToggleDot} aria-hidden />
+          Layers
         </button>
       )}
 
-      {genusStyle && legendOpen && (
-        <div className={styles.legend}>
+      {mapReady && legendOpen && (
+        <div className={styles.legend} role="group" aria-label="Map layers">
           <div className={styles.legendHeader}>
-            <span className={styles.legendTitle}>Most-planted genera</span>
+            <span className={styles.legendTitle}>Map layers</span>
             <button
               type="button"
               className={styles.legendClose}
               onClick={() => setLegendOpen(false)}
-              aria-label="Hide key"
+              aria-label="Hide layers"
             >
               ×
             </button>
           </div>
-          {genusStyle.legend.map((l) => (
-            <div key={l.genus} className={styles.legendRow}>
-              <span className={styles.swatch} style={{ background: l.color }} />
-              <span className={styles.legendName}>{l.genus}</span>
-              <span className={styles.legendCount}>{l.count.toLocaleString()}</span>
-            </div>
-          ))}
-          <div className={styles.legendRow}>
-            <span className={styles.swatch} style={{ background: genusStyle.otherColor }} />
-            <span className={styles.legendName}>Other</span>
+
+          <div className={styles.legendList}>
+            {LEGEND_ITEMS.map((item) => {
+              const on = !hidden.has(item.key);
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="switch"
+                  aria-checked={on}
+                  className={styles.legendRow}
+                  onClick={() => toggleLayer(item.key)}
+                >
+                  <span
+                    className={styles.swatch}
+                    style={{ background: item.color, opacity: on ? 1 : 0.3 }}
+                    aria-hidden
+                  />
+                  <span className={`${styles.legendName} ${on ? "" : styles.legendNameOff}`}>
+                    {item.label}
+                  </span>
+                  <span
+                    className={`${styles.legendSwitch} ${on ? styles.legendSwitchOn : ""}`}
+                    aria-hidden
+                  >
+                    <span className={styles.legendKnob} />
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -569,11 +799,6 @@ export function MapView() {
 function popupHTML(name: string, accession?: string) {
   const acc = accession ? `<div class="plant-popup-acc">${accession}</div>` : "";
   return `<div class="plant-popup"><em>${name}</em>${acc}</div>`;
-}
-
-function presencePopupHTML(emoji: string, isSelf: boolean) {
-  const label = isSelf ? "Your last known location" : "Last known location";
-  return `<div class="presence-popup"><span class="presence-emoji">${emoji}</span><span>${label}</span></div>`;
 }
 
 /**
